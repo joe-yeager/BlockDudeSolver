@@ -79,35 +79,42 @@ class Player:
         self.pos = Coordinate(0,0)
         self.dir = 0
         self.isHoldingBlock = False
-    
+        self.index = 0
+
     def setPos(self,x,y):
         self.pos.x = x
         self.pos.y = y
 
-    def setDirection(self, playerIndex):
-        self.dir = HEADING[playerIndex]
+    def setDirection(self, playerValue):
+        self.dir = playerValue
 
     def moveEast(self):
         self.pos.x += 1
+        self.index += 1
 
     def moveWest(self):
         self.pos.x -= 1
+        self.index -= 1
 
-    def moveNEast(self):
+    def moveNEast(self, width):
         self.moveEast()
         self.pos.y += 1
+        self.index -= (width - 1)
 
-    def moveNWest(self):
+    def moveNWest(self,width):
         self.moveWest()
         self.pos.y += 1
+        self.index -= (width + 1)
 
     def moveSEast(self):
         self.moveEast()
         self.pos.y -= 1
+        self.index += (width - 1)
 
     def moveSWest(self):
         self.moveWest()
         self.pos.y -= 1
+        self.index += (width + 1)
 
     def pickupBlock(self):
         self.isHoldingBlock = True
@@ -150,6 +157,7 @@ class Solver:
             elif self.level.layout[i] == WEST or self.level.layout[i] == EAST:
                 x, y = i % self.level.width, (i - (i%self.level.width))/self.level.width
                 self.player.setPos(x,y)
+                self.player.index = i
                 self.player.setDirection(self.level.layout[i])
 
     def shallowSolvabilityCheck(self):
@@ -166,32 +174,42 @@ class Solver:
     def checkVictory(self):
         taxiCabDistance()
         # Player is directly east of door, same elevation
-        if self.taxiCab.y == 0 && self.taxiCab.x == 1:
+        if self.taxiCab.y == 0 and self.taxiCab.x == 1:
             self.player.moveWest()
             declareVictory()
         # Player is directly west of door, same elevation
-        elif self.taxiCab.y == 0 && self.taxiCab.x == -1:
+        elif self.taxiCab.y == 0 and self.taxiCab.x == -1:
             self.player.moveEast()
             declareVictory()
             
         # Player is directly above door, fall
-        elif self.taxiCab.x == 0 && self.taxiCab.y == 1:
+        elif self.taxiCab.x == 0 and self.taxiCab.y == 1:
             self.player.fall()
             declareVictory()
 
         # player is ne, nw, sw, or se from door
-        elif abs(self.taxiCab.x) == 1 && abs(self.taxiCab.y) == 1 
-            if self.taxiCab.x == 1 && self.taxiCab.y == 1:
+        elif abs(self.taxiCab.x) == 1 and abs(self.taxiCab.y) == 1:
+            if self.taxiCab.x == 1 and self.taxiCab.y == 1:
                 self.player.moveNWest()
-            elif self.taxiCab.x == -1 && self.taxiCab.y == 1:
+            elif self.taxiCab.x == -1 and self.taxiCab.y == 1:
                 self.player.moveNEast()
-            elif self.taxiCab.x == 1 && self.taxiCab.y == -1:
+            elif self.taxiCab.x == 1 and self.taxiCab.y == -1:
                 self.player.moveSWest()
-            elif self.taxiCab.x == -1 && self.taxiCab.y == -1:
+            elif self.taxiCab.x == -1 and self.taxiCab.y == -1:
                 self.player.moveSEast()
             declareVictory()
 
+    def moveAndRefresh(self, move):
+        oldIndex = self.player.index
+        print(oldIndex)
+        move()
+        self.level.layout[oldIndex] = 0
+        self.level.layout[self.player.index] = self.player.dir
+        print(self.level.layout)
 
+
+    def test(self):
+        self.moveAndRefresh(self.player.moveWest)
 
 ####################         Program Loop        ####################
 if __name__=='__main__':
@@ -208,5 +226,12 @@ if __name__=='__main__':
         app.displayLevel(solver.level)
         solver.locateStartAndGoalState()
         solver.shallowSolvabilityCheck()
+    solver.test()
 
+    # This code will begin to run after the gui is rendered
+    def startFunction():
+        app.clearCanvas()
+        app.displayLevel(solver.level)
+
+    root.after(5000, startFunction)
     app.run()
