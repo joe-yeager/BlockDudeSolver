@@ -51,10 +51,10 @@ class App:
                 y = (row*24) + 40
                 self.canvas.create_image(x,y, image=self.imageArray[level.layout[i]])
 
-    def loadLevels(self,fileArray):
+    def loadLevels(self,path, fileArray):
         length = len(fileArray)
         for i in range(0,length):
-            with open(fileArray[i], 'rb') as f:
+            with open(path + fileArray[i], 'rb') as f:
                 reader = csv.reader(f)
                 reader = list(reader).pop(0)
                 level = map(int,reader)
@@ -142,8 +142,6 @@ class Solver:
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
 
-        print(self.fall[1])
-
     def setLevel(self,level):
         self.level = level
         self.length = len(self.level.layout)
@@ -208,15 +206,13 @@ class Solver:
         print(self.level.layout)
 
 
-    def test(self):
-        self.moveAndRefresh(self.player.moveWest)
-
 ####################         Program Loop        ####################
 if __name__=='__main__':
     root = Tk()
     app = App(root)
-    testFiles = ["./testLevels/level1.csv"]
-    app.loadLevels(testFiles)
+    path = "./testLevels/"
+    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
+    app.loadLevels(path, testFiles)
     solver = Solver()
 
     numLevels = len(app.levels)
@@ -226,7 +222,6 @@ if __name__=='__main__':
         app.displayLevel(solver.level)
         solver.locateStartAndGoalState()
         solver.shallowSolvabilityCheck()
-    solver.test()
 
     # This code will begin to run after the gui is rendered
     def startFunction():
