@@ -6,7 +6,6 @@ import time
 
 EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
-HEADING = {3:"w",4:"e"}
 
 #####################################################################
 #####################################################################
@@ -25,6 +24,14 @@ class Level:
         self.width = width
         self.height = height
         self.layout = layout
+
+class Tree:
+    def __init__(self):
+        self.move = None
+        self.state = None
+        self.left = None
+        self.middle = None
+        self.right = None
 
 #####################################################################
 #####################################################################
@@ -120,14 +127,14 @@ class Player:
     def moveNWest(self,width):
         self.moveWest()
         self.pos.y += 1
-        self.index -= (width + 1)
+        self.index -= (width)
 
-    def moveSEast(self):
+    def moveSEast(self, width):
         self.moveEast()
         self.pos.y -= 1
-        self.index += (width - 1)
+        self.index += (width)
 
-    def moveSWest(self):
+    def moveSWest(self,width):
         self.moveWest()
         self.pos.y -= 1
         self.index += (width + 1)
@@ -139,7 +146,9 @@ class Player:
         self.isHoldingBlock = False
 
     def fall(self):
-        self.post.y -= 1;
+        self.pos.y -= 1;
+        self.index -= (width)
+
 
 #####################################################################
 #####################################################################
@@ -152,8 +161,10 @@ class Solver:
         
         self.player = Player()
         self.victory = False;
-        self.east = [[0,0,4,0],[0,0,3,0],[0,0,3,1],[0,0,3,2]]
-        self.west = [[0,0,0,3],[0,0,0,4],[0,0,1,4],[0,0,2,4]]
+        self.east = [[0,0,4,0]]
+        self.west = [[0,0,0,3]]
+        self.faceEast = [[0,0,3,0],[0,0,3,1],[0,0,3,2]]
+        self.faceWest = [[0,0,0,4],[0,0,1,4],[0,0,2,4]]
         self.nw = [[0,0,1,3],[0,0,2,3]]
         self.ne = [[0,0,4,1],[0,0,4,2]]
         self.pickUp = [[0,0,4,2],[0,0,2,3]]
@@ -162,17 +173,21 @@ class Solver:
         self.se = [[4,0,1,0],[4,0,2,0]]
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
+
         self.obstacleFlag = False
         self.trapFlag = False
         self.shallowUnsolvable = False
         self.moveQuadrants = []
-
+        self.moveList = []
+    
     def setLevel(self,level):
-        self.level = level
+        self.level = Level(level.width,level.height,list(level.layout) )
+        self.currentLevel = Level(self.level.width, self.level.height, list(self.level.layout) )
         self.length = len(self.level.layout)
 
     def locateStartAndGoalState(self):
-        self.goalPos, self.playerPos, self.playerDir = -1,-1,""
+        self.goalPos = Coordinate(-1,-1)
+        self.player.setPos(-1,-1)
         for i in range(0,self.length):
             if self.level.layout[i] == DOOR:
                 x, y = i % self.level.width, (i - (i%self.level.width))/self.level.width
@@ -181,13 +196,13 @@ class Solver:
                 x, y = i % self.level.width, (i - (i%self.level.width))/self.level.width
                 self.player.setPos(x,y)
                 self.player.index = i
+                self.player.index2 = i
                 self.player.setDirection(self.level.layout[i])
 
     def shallowSolvabilityCheck(self):
-        if self.goalPos == -1 or self.playerPos == -1 or self.playerDir == "":
-            self.shallowUnsolvable = False
-        else:
-            self.shallowUnsolvable = True
+        if self.goalPos.x == -1 or self.player.pos.x == -1:
+            return  True
+        return False
 
     def taxiCabDistance(self):
         self.taxiCab = Coordinate(self.goalPos.x-self.player.pos.x, self.goalPos.y-self.player.pos.y)
@@ -196,68 +211,37 @@ class Solver:
         else: # the door is east
             self.modifier = 1
 
-    def declareVictory(self):
-        self.victory = True
-
     #TODO Come up with constraints for this, and get rid of this POS
     def checkVictory(self):
-        taxiCabDistance()
+        self.taxiCabDistance()
         # Player is directly east of door, same elevation
         if self.taxiCab.y == 0 and self.taxiCab.x == 1:
-            self.player.moveWest()
-            declareVictory()
+            self.victory = True
         
         # Player is directly west of door, same elevation
         elif self.taxiCab.y == 0 and self.taxiCab.x == -1:
-            self.player.moveEast()
-            declareVictory()
+            self.victory = True
             
         # Player is directly above door, fall
         elif self.taxiCab.x == 0 and self.taxiCab.y == 1:
-            self.player.fall()
-            declareVictory()
+            self.victory = True
 
         # player is ne, nw, sw, or se from door
         elif abs(self.taxiCab.x) == 1 and abs(self.taxiCab.y) == 1:
-            if self.taxiCab.x == 1 and self.taxiCab.y == 1:
-                self.player.moveNWest()
-            elif self.taxiCab.x == -1 and self.taxiCab.y == 1:
-                self.player.moveNEast()
-            elif self.taxiCab.x == 1 and self.taxiCab.y == -1:
-                self.player.moveSWest()
-            elif self.taxiCab.x == -1 and self.taxiCab.y == -1:
-                self.player.moveSEast()
-            declareVictory()
+            self.victory = True
 
-    def performMove(self, move):
+    def performMove(self,level, move, arg=None):
         oldIndex = self.player.index
-        move()
-        self.level.layout[oldIndex] = 0
-        self.level.layout[self.player.index] = self.player.dir
+        if arg == None:
+            move()
+        else:
+            move(arg)
+        level.layout[oldIndex] = 0
+        level.layout[self.player.index] = self.player.dir
 
     # check the block in front of player
     # if there is a brick, check the space above it
     # while you scan forward, check down to see if there is a drop off
-    # def checkForwardObstacles(self, prevHeight, height, index):
-    #     if height - prevHeight > 1:
-    #         self.setObstacleFlag()
-    #         return
-
-    #     if index % self.level.width ==  0:
-    #         return
-
-    #     # Go up
-    #     elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
-    #         self.checkForwardObstacles(prevHeight, height + 1,index - self.level.width)
-        
-    #     # Go forward
-    #     elif self.level.layout[index] == EMPY:
-    #         newIndex = index + self.modifier +  (height * self.level.width)
-    #         self.checkForwardObstacles(height, 0, newIndex)
-
-    #     elif self.level.layout[index] == DOOR:
-    #         return
-
     def checkObstaclesHelper(self, prevHeight, height, depth, index):
         if height - prevHeight > 1:
             self.obstacleFlag = True
@@ -299,42 +283,143 @@ class Solver:
 
     def generateMoveQuads(self):
         i,l,w = self.player.index, self.level.layout, self.level.width
+        pg = []
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
-
+        self.moveQuadrants = []
         self.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
         self.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
         self.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
         self.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
-        for item in self.moveQuadrants:
-            if item in self.west:
-                print "west"
-            if item in self.east:
-                print "east"
-            if item in self.nw:
-                print "nw"
-            if item in self.ne:
-                print "ne"
-            if item in self.se:
-                print "se"
-            if item in self.sw:
-                print "sw"
-            if item in self.east:
-                print "east"
-            if item in self.pickUp:
-                print "pickUp"
-            if item in self.drop:
-                print "drop"
-            if item in self.fall:
-                print "fall"
+        print(self.moveQuadrants)
+
+    def checkValidMoves(self, move):
+        if item in self.fall:
+            return "fall"
+        elif item in self.west:
+            return "west"
+        elif item in self.east:
+            return "east"
+        elif item in self.faceWest:
+            return "faceWest"
+        elif item in self.faceEast:
+            return "faceEast"
+        elif item in self.nw:
+            return "nw"
+        elif item in self.ne:
+            return "ne"
+        elif item in self.se:
+            return "se"
+        elif item in self.sw:
+            return "sw"
+        elif item in self.east:
+            return "east"
+        elif item in self.pickUp:
+            return "pickUp"
+        elif item in self.drop:
+            return "drop"
+        else:
+            return None
+
+    # Fill the tree from left to right
+    def addMove(self, moveNumber, move, node):
+        if node.left == None:
+            node.left = Tree()
+            # node.left.
+        elif node.middle == None:
+            node.middle = Tree()
+        elif node.right == None:
+            node.right = Tree()
+
+    def noObstacles(self, move):
+        if self.level.layout[self.player.index] == WEST and self.modifier == -1:
+            if move in self.fall:
+                self.performMove(self.level, self.player.fall)
+                self.moveList.append("fall")
+            elif move in self.west:
+                self.performMove(self.level, self.player.moveWest)
+                self.moveList.append("w")
+            elif move in self.nw:
+                self.performMove(self.level, self.player.moveNWest, self.level.width)
+                self.moveList.append("nw")
+            elif move in self.sw:
+                self.performMove(self.level, self.player.moveSWest, self.level.width)
+                self.moveList.append("sw")
 
 
+        elif self.level.layout[self.player.index] == EAST and self.modifier == 1:
+            if move in self.east:
+                self.performMove(self.level, self.player.moveEast)
+                self.moveList.append("e")
+            elif move in self.ne:
+                self.performMove(self.level, self.player.moveNEast, self.level.width)
+                self.moveList.append("ne")
+            elif move in self.se:
+                self.performMove(self.level, self.player.moveSEast, self.level.width)
+                self.moveList.append("se")
+        # print(self.moveList)
+
+
+    def solve(self):
+        self.locateStartAndGoalState()
+        if self.shallowSolvabilityCheck():
+            print("Level is unsolvable")
+            return
+
+        self.checkObstacles()
+        decisionTree = Tree()
+        while not self.victory:
+            if self.obstacleFlag:
+                print("There are obstacles")
+                break
+            else: # No obstacles detected, move to goal
+                self.generateMoveQuads()
+                for move in self.moveQuadrants:
+                    self.noObstacles(move)
+                self.checkVictory()
+        print("Solved")
+
+    def translateMove(self, move):
+        if move == "fall":
+            self.performMove(self.currentLevel,self.player.fall)
+        
+        elif move == "w":
+            self.performMove(self.currentLevel,self.player.moveWest)
+        elif move == "nw":
+            self.performMove(self.currentLevel,self.player.moveNWest, self.level.width)
+        elif move == "sw":
+            self.performMove(self.currentLevel,self.player.moveSWest, self.level.width)
+        elif move == "fw":
+            self.performMove(self.currentLevel,self.player.setDirection, WEST)
+
+        elif move == "e":
+            self.performMove(self.currentLevel,self.player.moveEast)
+        elif move == "ne":
+            self.performMove(self.currentLevel,self.player.moveNEast, self.level.width)
+        elif move == "se":
+            self.performMove(self.currentLevel,self.player.moveSEast, self.level.width)
+        elif move == "fe":
+            self.performMove(self.currentLevel,self.player.setDirection, EAST)
+
+        
+        elif move == "pickup":
+            self.performMove(level,self.player.pickupBlock)
+        elif move == "drop":
+            self.performMove(level,self.player.dropBlock)
+
+    def resetState(self):
+        self.player.index = self.player.index2
+
+    def stepThroughSolution(self):
+        print(self.moveList)
+        currentMove = self.moveList.pop(0)
+        self.translateMove(currentMove)
 
 #####################################################################
 #####################################################################
 ####################         Program Loop        ####################
 #####################################################################
 #####################################################################
-#
+
 if __name__=='__main__':
     root = Tk()
     app = App(root)
@@ -345,7 +430,7 @@ if __name__=='__main__':
 
     numLevels = len(app.levels)
 
-    solver.setLevel(app.levels[0])
+    solver.setLevel(app.levels[1])
     app.updateCanvasDems(solver.level.width,solver.level.height)
     app.displayLevel(solver.level)
     solver.locateStartAndGoalState()
@@ -354,9 +439,22 @@ if __name__=='__main__':
     # This code will begin to run after the gui is rendered
     def startFunction():
         app.clearCanvas()
+        print(solver.level.layout)
         app.displayLevel(solver.level)
-        solver.checkObstacles()
-        solver.generateMoveQuads()
+        solver.solve()
+        solver.resetState()
+        
+        print(solver.currentLevel.layout)
+                
+        while(len(solver.moveList) > 0):
+            root.update()
+            solver.stepThroughSolution()
+            app.clearCanvas()
+            app.displayLevel(solver.currentLevel)
+            time.sleep(0.5)
 
-    root.after(1000, startFunction)
+
+
+
+    root.after(2000, startFunction)
     app.run()
