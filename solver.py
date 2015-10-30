@@ -142,6 +142,7 @@ class Solver:
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         self.obstacles = False
+        self.movelist = []
 
     def setLevel(self,level):
         self.level = level
@@ -181,6 +182,7 @@ class Solver:
         if self.taxiCab.y == 0 and self.taxiCab.x == 1:
             self.player.moveWest()
             declareVictory()
+        
         # Player is directly west of door, same elevation
         elif self.taxiCab.y == 0 and self.taxiCab.x == -1:
             self.player.moveEast()
@@ -218,7 +220,27 @@ class Solver:
     # check the block in front of player
     # if there is a brick, check the space above it
     # while you scan forward, check down to see if there is a drop off
-    def checkForwardObstacles(self, prevHeight, height, index):
+    # def checkForwardObstacles(self, prevHeight, height, index):
+    #     if height - prevHeight > 1:
+    #         self.setObstacleFlag()
+    #         return
+
+    #     if index % self.level.width ==  0:
+    #         return
+
+    #     # Go up
+    #     elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
+    #         self.checkForwardObstacles(prevHeight, height + 1,index - self.level.width)
+        
+    #     # Go forward
+    #     elif self.level.layout[index] == EMPY:
+    #         newIndex = index + self.modifier +  (height * self.level.width)
+    #         self.checkForwardObstacles(height, 0, newIndex)
+
+    #     elif self.level.layout[index] == DOOR:
+    #         return
+
+    def checkPitObstacles(self, prevHeight, height, index):
         if height - prevHeight > 1:
             self.setObstacleFlag()
             return
@@ -226,21 +248,39 @@ class Solver:
         if index % self.level.width ==  0:
             return
 
-        # Go up
-        elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
-            self.checkForwardObstacles(prevHeight, height + 1,index - self.level.width)
-        
-        # Go forward
-        elif self.level.layout[index] == EMPY:
-            newIndex = index + self.modifier +  (height * self.level.width)
-            self.checkForwardObstacles(height, 0, newIndex)
-
-        elif self.level.layout[index] == DOOR:
+        if self.level.layout[index] == DOOR:
             return
+
+        elif self.level.layout[index] == EMPY:
+            spaceBelow = self.level.layout[index + self.level.width]
+            if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
+                print("Space below is block")
+                newIndex = index + self.modifier
+                self.checkPitObstacles(0, 0, newIndex)
+            elif spaceBelow == EMPY: # If space below is brick/block go down
+                print("Space below is empty")
+                newIndex = index  +  self.level.width
+                self.checkPitObstacles(0, 0, newIndex)
+            elif spaceBelow == DOOR:
+                return
+
+        elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
+            spaceAbove = self.level.layout[index - self.level.width]
+            if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
+                print("space Above is Block")
+                newIndex = index -  (height * self.level.width)
+                self.checkPitObstacles(prevHeight, height+1, newIndex)
+            elif spaceAbove == EMPY: # move forward when the block above is empty 
+                print("space Above is Empty")
+                newIndex = index  +  self.modifier
+                self.checkPitObstacles(height+1, 0, newIndex)
+            elif spaceAbove == DOOR:
+                return
 
     def checkObstacles(self):
         self.taxiCabDistance()
-        self.checkForwardObstacles(0,0,self.player.index + self.modifier)
+        # self.checkForwardObstacles(0,0,self.player.index + self.modifier)
+        self.checkPitObstacles(0,0,self.player.index + self.modifier)
         print(self.obstacles)
 
 ####################         Program Loop        ####################
@@ -254,7 +294,7 @@ if __name__=='__main__':
 
     numLevels = len(app.levels)
 
-    solver.setLevel(app.levels[7])
+    solver.setLevel(app.levels[1])
     app.updateCanvasDems(solver.level.width,solver.level.height)
     app.displayLevel(solver.level)
     solver.locateStartAndGoalState()
