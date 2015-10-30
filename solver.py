@@ -141,6 +141,7 @@ class Solver:
         self.se = [[4,0,1,0],[4,0,2,0]]
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
+        self.obstacles = False
 
     def setLevel(self,level):
         self.level = level
@@ -164,11 +165,16 @@ class Solver:
         return True
 
     def taxiCabDistance(self):
-        self.taxiCab = Coordinate(self.goalPos.x-self.player.x, self.goalPos.y-self.player.y)
+        self.taxiCab = Coordinate(self.goalPos.x-self.player.pos.x, self.goalPos.y-self.player.pos.y)
+        if self.taxiCab.x < 0: # the door is west
+            self.modifier = -1
+        else: # the door is east
+            self.modifier = 1
 
     def declareVictory(self):
         self.victory = True
 
+    #TODO Come up with constraints for this, and get rid of this POS
     def checkVictory(self):
         taxiCabDistance()
         # Player is directly east of door, same elevation
@@ -197,36 +203,69 @@ class Solver:
                 self.player.moveSEast()
             declareVictory()
 
-    def moveAndRefresh(self, move):
+    def performMove(self, move):
         oldIndex = self.player.index
-        print(oldIndex)
         move()
         self.level.layout[oldIndex] = 0
         self.level.layout[self.player.index] = self.player.dir
-        print(self.level.layout)
 
+    def clearObstaclesFlag(self):
+        self.obstacles = False
+
+    def setObstacleFlag(self):
+        self.obstacles = True
+
+    # check the block in front of player
+    # if there is a brick, check the space above it
+    # while you scan forward, check down to see if there is a drop off
+    def checkForwardObstacles(self, prevHeight, height, index):
+        if height - prevHeight > 1:
+            self.setObstacleFlag()
+            return
+
+        if index % self.level.width ==  0:
+            return
+
+        # Go up
+        elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
+            self.checkForwardObstacles(prevHeight, height + 1,index - self.level.width)
+        
+        # Go forward
+        elif self.level.layout[index] == EMPY:
+            newIndex = index + self.modifier +  (height * self.level.width)
+            self.checkForwardObstacles(height, 0, newIndex)
+
+        elif self.level.layout[index] == DOOR:
+            return
+
+    def checkObstacles(self):
+        self.taxiCabDistance()
+        self.checkForwardObstacles(0,0,self.player.index + self.modifier)
+        print(self.obstacles)
 
 ####################         Program Loop        ####################
 if __name__=='__main__':
     root = Tk()
     app = App(root)
     path = "./testLevels/"
-    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
+    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv","level8.csv"]
     app.loadLevels(path, testFiles)
     solver = Solver()
 
     numLevels = len(app.levels)
-    for i in range(0, numLevels):
-        solver.setLevel(app.levels[i])
-        app.updateCanvasDems(solver.level.width,solver.level.height)
-        app.displayLevel(solver.level)
-        solver.locateStartAndGoalState()
-        solver.shallowSolvabilityCheck()
+
+    solver.setLevel(app.levels[7])
+    app.updateCanvasDems(solver.level.width,solver.level.height)
+    app.displayLevel(solver.level)
+    solver.locateStartAndGoalState()
+    solver.shallowSolvabilityCheck()
 
     # This code will begin to run after the gui is rendered
     def startFunction():
         app.clearCanvas()
         app.displayLevel(solver.level)
+        solver.checkObstacles()
 
-    root.after(5000, startFunction)
+
+    root.after(1000, startFunction)
     app.run()
