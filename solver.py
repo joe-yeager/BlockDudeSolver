@@ -8,7 +8,12 @@ EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
 HEADING = {3:"w",4:"e"}
 
-####################        Data Types        ####################
+#####################################################################
+#####################################################################
+######################        Data Types        #####################
+#####################################################################
+#####################################################################
+
 class Coordinate:
     def __init__(self, x, y):
         self.x = x
@@ -21,7 +26,12 @@ class Level:
         self.height = height
         self.layout = layout
 
-####################        App Class        ####################
+#####################################################################
+#####################################################################
+######################        App Class        ######################
+#####################################################################
+#####################################################################
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -74,6 +84,12 @@ class App:
     def run(self):
         self.root.mainloop()
 
+#####################################################################
+#####################################################################
+######################      Player Class       ######################
+#####################################################################
+#####################################################################
+
 class Player:
     def __init__(self):
         self.pos = Coordinate(0,0)
@@ -125,7 +141,12 @@ class Player:
     def fall(self):
         self.post.y -= 1;
 
-####################        Solver Class        ####################
+#####################################################################
+#####################################################################
+####################        Solver Class        #####################
+#####################################################################
+#####################################################################
+
 class Solver:
     def __init__(self):
         
@@ -141,8 +162,10 @@ class Solver:
         self.se = [[4,0,1,0],[4,0,2,0]]
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
-        self.obstacles = False
-        self.movelist = []
+        self.obstacleFlag = False
+        self.trapFlag = False
+        self.shallowUnsolvable = False
+        self.moveQuadrants = []
 
     def setLevel(self,level):
         self.level = level
@@ -162,8 +185,9 @@ class Solver:
 
     def shallowSolvabilityCheck(self):
         if self.goalPos == -1 or self.playerPos == -1 or self.playerDir == "":
-            return False
-        return True
+            self.shallowUnsolvable = False
+        else:
+            self.shallowUnsolvable = True
 
     def taxiCabDistance(self):
         self.taxiCab = Coordinate(self.goalPos.x-self.player.pos.x, self.goalPos.y-self.player.pos.y)
@@ -211,12 +235,6 @@ class Solver:
         self.level.layout[oldIndex] = 0
         self.level.layout[self.player.index] = self.player.dir
 
-    def clearObstaclesFlag(self):
-        self.obstacles = False
-
-    def setObstacleFlag(self):
-        self.obstacles = True
-
     # check the block in front of player
     # if there is a brick, check the space above it
     # while you scan forward, check down to see if there is a drop off
@@ -240,12 +258,14 @@ class Solver:
     #     elif self.level.layout[index] == DOOR:
     #         return
 
-    def checkPitObstacles(self, prevHeight, height, index):
+    def checkObstaclesHelper(self, prevHeight, height, depth, index):
         if height - prevHeight > 1:
-            self.setObstacleFlag()
+            self.obstacleFlag = True
             return
+        if depth >= 2:
+            self.trapFlag = True
 
-        if index % self.level.width ==  0:
+        if index % self.level.width ==  0 or index < 0 or index > self.length:
             return
 
         if self.level.layout[index] == DOOR:
@@ -254,36 +274,51 @@ class Solver:
         elif self.level.layout[index] == EMPY:
             spaceBelow = self.level.layout[index + self.level.width]
             if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
-                print("Space below is block")
                 newIndex = index + self.modifier
-                self.checkPitObstacles(0, 0, newIndex)
+                self.checkObstaclesHelper(0, 0, 0, newIndex)
             elif spaceBelow == EMPY: # If space below is brick/block go down
-                print("Space below is empty")
                 newIndex = index  +  self.level.width
-                self.checkPitObstacles(0, 0, newIndex)
+                self.checkObstaclesHelper(0, 0, depth+1, newIndex)
             elif spaceBelow == DOOR:
                 return
 
         elif self.level.layout[index] == BRCK or self.level.layout[index] == BLCK:
             spaceAbove = self.level.layout[index - self.level.width]
             if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
-                print("space Above is Block")
                 newIndex = index -  (height * self.level.width)
-                self.checkPitObstacles(prevHeight, height+1, newIndex)
+                self.checkObstaclesHelper(prevHeight, height+1, 0, newIndex)
             elif spaceAbove == EMPY: # move forward when the block above is empty 
-                print("space Above is Empty")
                 newIndex = index  +  self.modifier
-                self.checkPitObstacles(height+1, 0, newIndex)
+                self.checkObstaclesHelper(height+1, 0, 0, newIndex)
             elif spaceAbove == DOOR:
                 return
 
     def checkObstacles(self):
         self.taxiCabDistance()
-        # self.checkForwardObstacles(0,0,self.player.index + self.modifier)
-        self.checkPitObstacles(0,0,self.player.index + self.modifier)
-        print(self.obstacles)
+        self.checkObstaclesHelper(0,0,0,self.player.index + self.modifier)
 
+    def generateMoveQuads(self):
+        i,l,w = self.player.index, self.level.layout, self.level.width
+        pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
+
+        self.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
+        self.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
+        self.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
+        self.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
+        for item in self.moveQuadrants:
+            if item in self.west:
+                print "west"
+            if item in self.east:
+                print "east"
+
+
+
+#####################################################################
+#####################################################################
 ####################         Program Loop        ####################
+#####################################################################
+#####################################################################
+#
 if __name__=='__main__':
     root = Tk()
     app = App(root)
@@ -294,7 +329,7 @@ if __name__=='__main__':
 
     numLevels = len(app.levels)
 
-    solver.setLevel(app.levels[1])
+    solver.setLevel(app.levels[0])
     app.updateCanvasDems(solver.level.width,solver.level.height)
     app.displayLevel(solver.level)
     solver.locateStartAndGoalState()
@@ -305,7 +340,7 @@ if __name__=='__main__':
         app.clearCanvas()
         app.displayLevel(solver.level)
         solver.checkObstacles()
-
+        solver.generateMoveQuads()
 
     root.after(1000, startFunction)
     app.run()
