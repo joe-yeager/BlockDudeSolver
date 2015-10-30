@@ -157,7 +157,7 @@ class Solver:
         self.nw = [[0,0,1,3],[0,0,2,3]]
         self.ne = [[0,0,4,1],[0,0,4,2]]
         self.pickUp = [[0,0,4,2],[0,0,2,3]]
-        self.drop = [[0,0,4,0], [0,0,0,3]]
+        self.drop = [[2,0,4,0], [0,2,0,3]]
         self.sw = [[0,3,0,1],[0,3,0,2]]
         self.se = [[4,0,1,0],[4,0,2,0]]
         self.fall = [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
@@ -310,6 +310,22 @@ class Solver:
                 print "west"
             if item in self.east:
                 print "east"
+            if item in self.nw:
+                print "nw"
+            if item in self.ne:
+                print "ne"
+            if item in self.se:
+                print "se"
+            if item in self.sw:
+                print "sw"
+            if item in self.east:
+                print "east"
+            if item in self.pickUp:
+                print "pickUp"
+            if item in self.drop:
+                print "drop"
+            if item in self.fall:
+                print "fall"
 
 
 
