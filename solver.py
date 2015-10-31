@@ -128,26 +128,23 @@ class Player:
         self.pos.y += 1
         self.index -= (width)
 
+    def fall(self, width):
+        self.pos.y -= 1;
+        self.index += (width)
+
     def moveSEast(self, width):
         self.moveEast()
-        self.pos.y -= 1
-        self.index += (width)
+        self.fall()
 
     def moveSWest(self,width):
         self.moveWest()
-        self.pos.y -= 1
-        self.index += (width)
+        self.fall()
 
     def pickupBlock(self):
         self.isHoldingBlock = True
 
     def dropBlock(self):
         self.isHoldingBlock = False
-
-    def fall(self, width):
-        self.pos.y -= 1;
-        self.index += (width)
-
 
 #####################################################################
 #####################################################################
@@ -187,7 +184,6 @@ class Solver:
 
         self.obstacleFlag = False
         self.trapFlag = False
-        self.shallowUnsolvable = False
         self.moveQuadrants = []
         self.moveList = []
     
@@ -195,7 +191,7 @@ class Solver:
         self.level = Level(level.width,level.height,list(level.layout) )
         self.currentLevel = Level(self.level.width, self.level.height, list(self.level.layout) )
         self.length = len(self.level.layout)
-        self.moveFuncs = { 
+        self.moveFuncs = {  #These depend on properties of the level, so define it after they are set
             "fall"  : [self.player.fall, self.level.width],
             "w"     : [self.player.moveWest, None],
             "e"     : [self.player.moveEast, None],
@@ -219,14 +215,8 @@ class Solver:
             elif self.level.layout[i] == WEST or self.level.layout[i] == EAST:
                 x, y = i % self.level.width, (i - (i%self.level.width))/self.level.width
                 self.player.setPos(x,y)
-                self.player.index = i
-                self.player.index2 = i
+                self.player.index,self.player.index2 = i,i
                 self.player.setDirection(self.level.layout[i])
-
-    def shallowSolvabilityCheck(self):
-        if self.goalPos.x == -1 or self.player.pos.x == -1:
-            return  True
-        return False
 
     def taxiCabDistance(self):
         self.taxiCab = Coordinate(self.goalPos.x-self.player.pos.x, self.goalPos.y-self.player.pos.y)
@@ -366,8 +356,8 @@ class Solver:
     def solve(self):
         self.quadMoves = []
         self.locateStartAndGoalState()
-        if self.shallowSolvabilityCheck():
-            print("Level is unsolvable")
+        if self.goalPos.x == -1 or self.player.pos.x == -1:
+            print("Level is unsolvable, player or door do not exist")
             return
 
         self.checkObstacles()
