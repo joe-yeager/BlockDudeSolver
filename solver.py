@@ -28,7 +28,8 @@ class Level:
 class Tree:
     def __init__(self):
         self.move = None
-        self.state = None
+        self.level = None
+        self.index = None
         self.left = None
         self.middle = None
         self.right = None
@@ -181,8 +182,9 @@ class Solver:
             "fall": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
                         [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]],
         }
-
         self.obstacleFlag = False
+        self.obstacleHeight = 0
+        self.blocksRequired = 0
         self.trapFlag = False
         self.moveQuadrants = []
         self.moveList = []
@@ -247,13 +249,16 @@ class Solver:
     def checkObstaclesHelper(self, prevHeight, height, depth, index):
         if height - prevHeight > 1:
             self.obstacleFlag = True
-            return
+            self.obstacleHeight = height
+            self.obstableIndex = index
         if depth >= 2:
             self.trapFlag = True
         if index % self.level.width ==  0 or index < 0 or index > self.length or self.level.layout[index] == DOOR:
             return
 
         elif self.level.layout[index] == EMPY:
+            if self.obstacleFlag:
+                return
             spaceBelow = self.level.layout[index + self.level.width]
             if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
                 newIndex = index + self.modifier
@@ -274,10 +279,21 @@ class Solver:
                 self.checkObstaclesHelper(height+1, 0, 0, newIndex)
             elif spaceAbove == DOOR:
                 return
+    
+    def calculateBlocksRequired(self):
+        self.blocksRequired = 0
+        for i in range (1, self.obstacleHeight):
+            tempI = self.obstableIndex - (i * self.modifier)
+            for j in range (i, self.obstacleHeight):
+                tempI -= width
+                if self.level.layout[tempI] == EMPY:
+                    self.blocksRequired += 1
 
     def checkObstacles(self):
         self.taxiCabDistance()
         self.checkObstaclesHelper(0,0,0,self.player.index + self.modifier)
+        if self.obstacleFlag:
+            self.calculateBlocksRequired()
 
     def generateMoveQuads(self):
         i,l,w = self.player.index, self.level.layout, self.level.width
@@ -289,15 +305,7 @@ class Solver:
         self.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
         self.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
 
-    # Fill the tree from left to right
-    def addMove(self, moveNumber, move, node):
-        if node.left == None:
-            node.left = Tree()
-            # node.left.
-        elif node.middle == None:
-            node.middle = Tree()
-        elif node.right == None:
-            node.right = Tree()
+
 
     def analyzeMoveQuads(self, move):
 
@@ -321,38 +329,37 @@ class Solver:
             elif move in self.se:
                 self.quadMoves.append("se")
 
+    def selectMove(self, moveCode):
+        self.performMove(self.level, self.moveFuncs[moveCode][0], self.moveFuncs[moveCode][1])
+        self.moveList.append(moveCode)
+
     def pickMove(self):
-        if not self.obstacleFlag: # no obstables, pick moves that will get you closer to goal
-            if "fall" in self.quadMoves: # if fall is a valid move, it must be chosen.
-                self.player.falling = True
-                self.performMove(self.level, self.moveFuncs["fall"][0], self.moveFuncs["fall"][1])
-                self.moveList.append("fall")
-            elif self.modifier == -1:  # goal is west
-                self.player.falling = False
+        if "fall" in self.quadMoves: # if fall is a valid move, it must be chosen.
+            self.player.falling = True
+            self.selectMove("fall")
+
+        elif not self.obstacleFlag: # no obstables, pick moves that will get you closer to goal
+            self.player.falling = False
+            if self.modifier == -1:  # goal is west
                 if "w" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["w"][0], self.moveFuncs["w"][1])
-                    self.moveList.append("w")
+                    self.selectMove("w")
                 elif "nw" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["nw"][0], self.moveFuncs["nw"][1])
-                    self.moveList.append("nw")
+                    self.selectMove("nw")
                 elif "sw" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["sw"][0], self.moveFuncs["sw"][1])
-                    self.moveList.append("sw")
+                    self.selectMove("sw")
+
 
             else:
-                self.player.falling = False
                 if "e" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["e"][0], self.moveFuncs["e"][1])
-                    self.moveList.append("e")
+                    self.selectMove("e")
                 elif "ne" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["ne"][0], self.moveFuncs["ne"][1])
-                    self.moveList.append("ne")
+                    self.selectMove("ne")
                 elif "se" in self.quadMoves:
-                    self.performMove(self.level, self.moveFuncs["se"][0], self.moveFuncs["se"][1])
-                    self.moveList.append("se")
-
+                    self.selectMove("se")
+        
+        else:  #obstacles, fun starts
+            self.player.falling = False
         self.quadMoves = []
-
     def solve(self):
         self.quadMoves = []
         self.locateStartAndGoalState()
@@ -361,7 +368,7 @@ class Solver:
             return
 
         self.checkObstacles()
-        decisionTree = Tree()
+
         while not self.victory:
             self.generateMoveQuads()
             for move in self.moveQuadrants:
@@ -370,16 +377,14 @@ class Solver:
             self.pickMove()
         print("Solved!!!")
 
-    def translateMove(self, move):
-        self.performMove(self.currentLevel, self.moveFuncs[move][0], self.moveFuncs[move][1])
-
     def resetState(self):
         self.player.index = self.player.index2
 
     def stepThroughSolution(self):
         print(self.moveList)
         currentMove = self.moveList.pop(0)
-        self.translateMove(currentMove)
+        self.performMove(self.currentLevel, self.moveFuncs[currentMove][0], self.moveFuncs[currentMove][1])
+
 
 #####################################################################
 #####################################################################
@@ -395,8 +400,8 @@ if __name__=='__main__':
                  "level5.csv","level6.csv","level7.csv","level8.csv"]
     gamePath = "./gameLevels/"
     gameFiles = ["level2.csv"]
-    # app.loadLevels(path, testFiles)
-    app.loadLevels(gamePath, gameFiles)
+    app.loadLevels(path, testFiles)
+    # app.loadLevels(gamePath, gameFiles)
 
     numLevels = len(app.levels)
 
