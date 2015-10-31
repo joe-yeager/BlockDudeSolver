@@ -48,7 +48,6 @@ class App:
         self.canvas = Canvas(self.frame, bg="white", width=(width*24)+100, height=(height*24)+100)
         self.canvas.pack()
         self.levels = []
-
         filedir = "./assets/"
         filenames = ["brick.png","block.png","dudeLeft.png","dudeRight.png","door.png"]
         
@@ -58,6 +57,8 @@ class App:
             self.imageArray.append(ImageTk.PhotoImage(file=filedir + filenames[i]))
 
     def displayLevel(self,level):
+        self.canvas.delete("all")
+        self.updateCanvasDems(level.width,level.height)
         length = len(level.layout)
         row = 0
         for i in range(0,length):
@@ -84,9 +85,6 @@ class App:
         newWidth = (width*24)+100
         newHeight = (height*24)+100
         self.canvas.config(width=newWidth,height=newHeight)
-
-    def clearCanvas(self):
-        self.canvas.delete("all")
 
     def run(self):
         self.root.mainloop()
@@ -176,14 +174,16 @@ class Solver:
                         [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
 
         ## Victory Moves
-        self.eastV = [[0,0,4,5]]
-        self.westV = [[0,0,5,3]]
-        self.nwV = [[5,0,1,3],[5,0,2,3]]
-        self.neV = [[0,5,4,1],[0,5,4,2]]
-        self.swV = [[0,3,5,1],[0,3,5,2]]
-        self.seV = [[4,0,1,5],[4,0,2,5]]
-        self.fallV = [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
-                        [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]]
+        self.V = {
+            "e":    [[0,0,4,5]],
+            "w":    [[0,0,5,3]],
+            "nw":   [[5,0,1,3],[5,0,2,3]],
+            "ne":   [[0,5,4,1],[0,5,4,2]],
+            "sw":   [[0,3,5,1],[0,3,5,2]],
+            "se":   [[4,0,1,5],[4,0,2,5]],
+            "fall": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
+                        [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]],
+        }
 
         self.obstacleFlag = False
         self.trapFlag = False
@@ -223,23 +223,11 @@ class Solver:
             self.modifier = 1
 
     def checkVictory(self, move):
-        length = len(self.moveList)
-        if move in self.fallV:
-            self.moveList.append("fall")
-        elif move in self.westV:
-            self.moveList.append("w")
-        elif move in self.nwV:
-            self.moveList.append("nw")
-        elif move in self.swV:
-            self.moveList.append("sw")
-        elif move in self.eastV:
-            self.moveList.append("e")
-        elif move in self.neV:
-            self.moveList.append("ne")
-        elif move in self.seV:
-            self.moveList.append("se")
-        if length != len(self.moveList):
-            self.victory = True
+        for k,v in self.V.iteritems():
+            if move in v:
+                self.moveList.append(k)
+                self.victory = True
+                break
 
     def performMove(self,level, move, arg=None):
         oldIndex = self.player.index
@@ -259,11 +247,7 @@ class Solver:
             return
         if depth >= 2:
             self.trapFlag = True
-
-        if index % self.level.width ==  0 or index < 0 or index > self.length:
-            return
-
-        if self.level.layout[index] == DOOR:
+        if index % self.level.width ==  0 or index < 0 or index > self.length or self.level.layout[index] == DOOR:
             return
 
         elif self.level.layout[index] == EMPY:
@@ -386,7 +370,6 @@ class Solver:
     def translateMove(self, move):
         if move == "fall":
             self.performMove(self.currentLevel,self.player.fall,self.level.width)
-        
         elif move == "w":
             self.performMove(self.currentLevel,self.player.moveWest)
         elif move == "nw":
@@ -395,7 +378,6 @@ class Solver:
             self.performMove(self.currentLevel,self.player.moveSWest, self.level.width)
         elif move == "fw":
             self.performMove(self.currentLevel,self.player.setDirection, WEST)
-
         elif move == "e":
             self.performMove(self.currentLevel,self.player.moveEast)
         elif move == "ne":
@@ -404,8 +386,6 @@ class Solver:
             self.performMove(self.currentLevel,self.player.moveSEast, self.level.width)
         elif move == "fe":
             self.performMove(self.currentLevel,self.player.setDirection, EAST)
-
-        
         elif move == "pickup":
             self.performMove(level,self.player.pickupBlock)
         elif move == "drop":
@@ -436,12 +416,10 @@ if __name__=='__main__':
     numLevels = len(app.levels)
 
     solver.setLevel(app.levels[1])
-    app.updateCanvasDems(solver.level.width,solver.level.height)
     app.displayLevel(solver.level)
 
     # This code will begin to run after the gui is rendered
     def startFunction():
-        app.clearCanvas()
         app.displayLevel(solver.level)
         solver.solve()
         solver.resetState()
@@ -449,7 +427,6 @@ if __name__=='__main__':
         while(len(solver.moveList) > 0):
             root.update()
             solver.stepThroughSolution()
-            app.clearCanvas()
             app.displayLevel(solver.currentLevel)
             time.sleep(0.2)
 
