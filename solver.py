@@ -391,26 +391,31 @@ if __name__=='__main__':
     root = Tk()
     app = App(root)
     path = "./testLevels/"
-    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv","level8.csv"]
-    app.loadLevels(path, testFiles)
-    solver = Solver()
+    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv",
+                 "level5.csv","level6.csv","level7.csv","level8.csv"]
+    gamePath = "./gameLevels/"
+    gameFiles = ["level2.csv"]
+    # app.loadLevels(path, testFiles)
+    app.loadLevels(gamePath, gameFiles)
 
     numLevels = len(app.levels)
 
-    solver.setLevel(app.levels[1])
-    app.displayLevel(solver.level)
-
     # This code will begin to run after the gui is rendered
     def startFunction():
-        app.displayLevel(solver.level)
-        solver.solve()
-        solver.resetState()
-                
-        while(len(solver.moveList) > 0):
-            root.update()
-            solver.stepThroughSolution()
-            app.displayLevel(solver.currentLevel)
-            time.sleep(0.2)
+        for i in range(0, numLevels):
+            solver = Solver()
+            solver.setLevel(app.levels[i])
+            app.displayLevel(solver.level)
+            solver.solve()
+            solver.resetState()
+            
+            raw_input("Press Enter to view solution...")
+            while(len(solver.moveList) > 0):
+                root.update()
+                solver.stepThroughSolution()
+                app.displayLevel(solver.currentLevel)
+                time.sleep(0.2)
+            raw_input("Press Enter to begin solving next level")
 
     root.after(2000, startFunction)
     app.run()
