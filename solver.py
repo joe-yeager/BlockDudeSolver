@@ -195,6 +195,19 @@ class Solver:
         self.level = Level(level.width,level.height,list(level.layout) )
         self.currentLevel = Level(self.level.width, self.level.height, list(self.level.layout) )
         self.length = len(self.level.layout)
+        self.moveFuncs = { 
+            "fall"  : [self.player.fall, self.level.width],
+            "w"     : [self.player.moveWest, None],
+            "e"     : [self.player.moveEast, None],
+            "nw"    : [self.player.moveNWest, self.level.width],
+            "ne"    : [self.player.moveNEast, self.level.width],
+            "sw"    : [self.player.moveSWest, self.level.width],
+            "se"    : [self.player.moveSEast, self.level.width],
+            "fw"    : [self.player.setDirection, WEST],
+            "fe"    : [self.player.setDirection, EAST],
+            "pickup": [self.player.pickupBlock, None],
+            "drop"  : [self.player.dropBlock, None],
+        }
 
     def locateStartAndGoalState(self):
         self.goalPos = Coordinate(-1,-1)
@@ -322,30 +335,30 @@ class Solver:
         if not self.obstacleFlag: # no obstables, pick moves that will get you closer to goal
             if "fall" in self.quadMoves: # if fall is a valid move, it must be chosen.
                 self.player.falling = True
-                self.performMove(self.level, self.player.fall, self.level.width)
+                self.performMove(self.level, self.moveFuncs["fall"][0], self.moveFuncs["fall"][1])
                 self.moveList.append("fall")
             elif self.modifier == -1:  # goal is west
                 self.player.falling = False
                 if "w" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveWest)
+                    self.performMove(self.level, self.moveFuncs["w"][0], self.moveFuncs["w"][1])
                     self.moveList.append("w")
                 elif "nw" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveNWest, self.level.width)
+                    self.performMove(self.level, self.moveFuncs["nw"][0], self.moveFuncs["nw"][1])
                     self.moveList.append("nw")
                 elif "sw" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveSWest, self.level.width)
+                    self.performMove(self.level, self.moveFuncs["sw"][0], self.moveFuncs["sw"][1])
                     self.moveList.append("sw")
 
             else:
                 self.player.falling = False
                 if "e" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveEast)
+                    self.performMove(self.level, self.moveFuncs["e"][0], self.moveFuncs["e"][1])
                     self.moveList.append("e")
                 elif "ne" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveNEast, self.level.width)
+                    self.performMove(self.level, self.moveFuncs["ne"][0], self.moveFuncs["ne"][1])
                     self.moveList.append("ne")
                 elif "se" in self.quadMoves:
-                    self.performMove(self.level, self.player.moveSEast, self.level.width)
+                    self.performMove(self.level, self.moveFuncs["se"][0], self.moveFuncs["se"][1])
                     self.moveList.append("se")
 
         self.quadMoves = []
@@ -368,28 +381,7 @@ class Solver:
         print("Solved!!!")
 
     def translateMove(self, move):
-        if move == "fall":
-            self.performMove(self.currentLevel,self.player.fall,self.level.width)
-        elif move == "w":
-            self.performMove(self.currentLevel,self.player.moveWest)
-        elif move == "nw":
-            self.performMove(self.currentLevel,self.player.moveNWest, self.level.width)
-        elif move == "sw":
-            self.performMove(self.currentLevel,self.player.moveSWest, self.level.width)
-        elif move == "fw":
-            self.performMove(self.currentLevel,self.player.setDirection, WEST)
-        elif move == "e":
-            self.performMove(self.currentLevel,self.player.moveEast)
-        elif move == "ne":
-            self.performMove(self.currentLevel,self.player.moveNEast, self.level.width)
-        elif move == "se":
-            self.performMove(self.currentLevel,self.player.moveSEast, self.level.width)
-        elif move == "fe":
-            self.performMove(self.currentLevel,self.player.setDirection, EAST)
-        elif move == "pickup":
-            self.performMove(level,self.player.pickupBlock)
-        elif move == "drop":
-            self.performMove(level,self.player.dropBlock)
+        self.performMove(self.currentLevel, self.moveFuncs[move][0], self.moveFuncs[move][1])
 
     def resetState(self):
         self.player.index = self.player.index2
@@ -429,9 +421,6 @@ if __name__=='__main__':
             solver.stepThroughSolution()
             app.displayLevel(solver.currentLevel)
             time.sleep(0.2)
-
-
-
 
     root.after(2000, startFunction)
     app.run()
