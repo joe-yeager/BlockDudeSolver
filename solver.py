@@ -10,21 +10,17 @@ width, height = 0,0
 #####################################################################
 ######################        Data Types        #####################
 #####################################################################
-
 class Coordinate:
     def __init__(s, x, y):
         s.x, s.y = x, y
 
 class Level:
     def __init__(s, width,height,layout):
-        s.width = width
-        s.height = height
-        s.layout = layout
+        s.width, s.height, s.layout = width, height, layout
 
 #####################################################################
 ######################        App Class        ######################
 #####################################################################
-
 class App:
     def __init__(s, root):
         s.root = root
@@ -77,7 +73,6 @@ class App:
 #####################################################################
 ######################      Player Class       ######################
 #####################################################################
-
 class Player:
     def __init__(s):
         s.pos = Coordinate(0,0)
@@ -121,13 +116,11 @@ class Player:
 #####################################################################
 ####################        Solver Class        #####################
 #####################################################################
-
 class Solver:
     def __init__(s):
         
         s.player = Player()
         s.victory = False;
-
         s.validMoves = {
             "e": [[0,0,4,0]],
             "w": [[0,0,0,3]],
@@ -140,8 +133,6 @@ class Solver:
             "fa": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                             [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         }
-
-        ## Victory Moves
         s.V = {
             "e":    [[0,0,4,5]],
             "w":    [[0,0,5,3]],
@@ -153,7 +144,6 @@ class Solver:
         s.obstacleFlag,s.trapFlag = False, False
         s.obstacleHeight,s.blocksRequired,s.availableBlocks = 0,0,0
         s.blockGoals, s.blockLocs, s.moveQuadrants,s.moveList,s.quadMoves = [],[],[],[],[]
-
     
     def prettyPrintLevel(s):
         lower, uppper = 0, 0
@@ -271,11 +261,11 @@ class Solver:
                     s.availableBlocks += 1
             tempX += level.width
 
-    def findClosestBlock(s):
+    def findClosestSubgoal(s, priority, restriction):
         s.closest = sys.maxint
-        for i in range(0,len(s.blockLocs)):
-            if s.blockLocs[i] not in s.blockGoals:
-                dist = (s.blockLocs[i] % s.level.width) - (s.player.index % s.level.width)
+        for i in range(0,len(priority)):
+            if priority[i] not in restriction:
+                dist = (priority[i] % s.level.width) - (s.player.index % s.level.width)
                 if abs(dist) < s.closest:
                     s.closest = dist
 
@@ -326,7 +316,7 @@ class Solver:
             s.prioritizeMoves(["e","ne","fe"])
 
     def solveObstacle(s):
-        s.findClosestBlock()
+        s.findClosestSubgoal(s.blockLocs, s.blockGoals)
         playerWest, playerEast = s.player.index - 1, s.player.index + 1
         playerAdj = playerWest if s.player.dir == WEST else playerEast
         if s.player.isHoldingBlock:
@@ -335,16 +325,9 @@ class Solver:
                 s.blockLocs.append(playerAdj)
                 s.selectMove("dr")
                 s.checkObstacles(s.level)
-
             else:
-                s.closest = sys.maxint
-                for i in range(0,len(s.blockGoals)):
-                    if s.blockGoals[i] not in s.blockLocs:
-                        dist = (s.blockGoals[i] % s.level.width) - (s.player.index % s.level.width)
-                        if abs(dist) < s.closest:
-                            s.closest = dist
+                s.findClosestSubgoal(s.blockGoals, s.blockLocs)
                 s.checkPriority(s.closest)
-
         elif "pu" in s.quadMoves and playerAdj not in s.blockGoals:
             s.level.layout[playerAdj] = EMPY
             s.selectMove("pu")
@@ -356,11 +339,9 @@ class Solver:
         if "fa" in s.quadMoves: # if fall is a valid move, it must be chosen.
             s.player.falling = True
             s.selectMove("fa")
-
         elif not s.obstacleFlag: # no obstables, pick moves that will get you closer to goal
             s.player.falling = False
             s.checkPriority(s.modifier)
-        
         else:
             s.player.falling = False
             s.solveObstacle()
@@ -394,7 +375,6 @@ class Solver:
 #####################################################################
 ####################         Program Loop        ####################
 #####################################################################
-
 if __name__=='__main__':
     root = Tk()
     app = App(root)
