@@ -133,14 +133,6 @@ class Player:
         self.pos.y -= 1;
         self.index += (width)
 
-    def moveSEast(self, width):
-        self.moveEast()
-        self.fall()
-
-    def moveSWest(self,width):
-        self.moveWest()
-        self.fall()
-
     def pickupBlock(self):
         self.isHoldingBlock = True
 
@@ -168,8 +160,6 @@ class Solver:
             "ne": [[0,0,4,1],[0,0,4,2]],
             "pickup": [[0,0,4,2],[0,0,2,3]],
             "drop": [[0,0,4,0], [0,0,0,3]],
-            "sw": [[0,3,0,1],[0,3,0,2]],
-            "se": [[4,0,1,0],[4,0,2,0]],
             "fall": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                             [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]],
         }
@@ -180,8 +170,6 @@ class Solver:
             "w":    [[0,0,5,3]],
             "nw":   [[5,0,1,3],[5,0,2,3]],
             "ne":   [[0,5,4,1],[0,5,4,2]],
-            "sw":   [[0,3,5,1],[0,3,5,2]],
-            "se":   [[4,0,1,5],[4,0,2,5]],
             "fall": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
                         [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]],
         }
@@ -218,8 +206,6 @@ class Solver:
             "e"     : [self.player.moveEast, None],
             "nw"    : [self.player.moveNWest, self.level.width],
             "ne"    : [self.player.moveNEast, self.level.width],
-            "sw"    : [self.player.moveSWest, self.level.width],
-            "se"    : [self.player.moveSEast, self.level.width],
             "fw"    : [self.player.setDirection, WEST],
             "fe"    : [self.player.setDirection, EAST],
             "pickup": [self.player.pickupBlock, None],
@@ -324,10 +310,10 @@ class Solver:
     def findClosestBlock(self):
         self.closest = sys.maxint
         for i in range(0,len(self.blockLocs)):
-            dist = self.blockLocs[i] - self.player.index
-            # dist %= self.level.width
-            if abs(dist) < self.closest:
-                self.closest = dist
+            if self.blockLocs[i] not in self.blockGoals:
+                dist = (self.blockLocs[i] % self.level.width) - (self.player.index % self.level.width)
+                if abs(dist) < self.closest:
+                    self.closest = dist
 
     def checkObstacles(self, level):
         self.taxiCabDistance()
@@ -361,37 +347,31 @@ class Solver:
 
     def selectMove(self, moveCode):
         print moveCode
+        print self.closest
         self.performMove(self.level, self.moveFuncs[moveCode][0], self.moveFuncs[moveCode][1])
         self.moveList.append(moveCode)
 
     def prioritizeWest(self):
-        if "w" in self.quadMoves:
-            self.selectMove("w")
-        elif "nw" in self.quadMoves:
-            self.selectMove("nw")
-        elif "sw" in self.quadMoves:
-            self.selectMove("sw")
-        elif "fw" in self.quadMoves:
-            self.selectMove("fw")
+        westMoves = ["w","nw","fw"]
+        for move in self.quadMoves:
+            if move in westMoves:
+                self.selectMove(move)
 
     def prioritizeEast(self):
-        if "e" in self.quadMoves:
-            self.selectMove("e")
-        elif "ne" in self.quadMoves:
-            self.selectMove("ne")
-        elif "se" in self.quadMoves:
-            self.selectMove("se")
-        elif "fe" in self.quadMoves:
-            self.selectMove("fe")
+        eastMoves = ["e","ne","fe"]
+        for move in self.quadMoves:
+            if move in eastMoves:
+                self.selectMove(move)
 
     def solveObstacle(self):
         self.findClosestBlock()
         playerWest = self.player.index - 1
         playerEast = self.player.index + 1
+        playerAdj = playerWest if self.player.dir == WEST else playerEast
         if self.player.isHoldingBlock:
-            dropLocation = playerWest if self.player.dir == WEST else playerEast
-            if dropLocation in self.blockGoals:
-                self.level.layout[dropLocation] = BLCK
+            if playerAdj in self.blockGoals:
+                self.level.layout[playerAdj] = BLCK
+                self.blockLocs.append(playerAdj)
                 self.selectMove("drop")
                 self.obstacleFlag = False
                 self.checkObstacles(self.level)
@@ -399,15 +379,19 @@ class Solver:
             else:
                 self.closest = sys.maxint
                 for i in range(0,len(self.blockGoals)):
-                    dist = self.blockGoals[i] - self.player.index
-                    if abs(dist) < self.closest:
-                        self.closest = dist
+                    if self.blockGoals[i] not in self.blockLocs:
+                        dist = (self.blockGoals[i] % self.level.width) - (self.player.index % self.level.width)
+                        if abs(dist) < self.closest:
+                            self.closest = dist
+                if self.closest < 0:  #block is to the west
+                    self.prioritizeWest()
+                elif self.closest > 0:  #block is to the east
+                    self.prioritizeEast()
 
-        if "pickup" in self.quadMoves and not self.player.isHoldingBlock and self.obstacleFlag:
-            pickupLoc = playerWest if self.player.dir == WEST else playerEast
-            self.level.layout[pickupLoc] = EMPY
+        elif "pickup" in self.quadMoves and playerAdj not in self.blockGoals:
+            self.level.layout[playerAdj] = EMPY
             self.selectMove("pickup")
-            self.blockLocs.remove(pickupLoc)
+            self.blockLocs.remove(playerAdj)
         elif self.closest < 0:  #block is to the west
             self.prioritizeWest()
         elif self.closest > 0:  #block is to the east
@@ -476,7 +460,7 @@ if __name__=='__main__':
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv",
                  "level5.csv","level6.csv","level7.csv","level8.csv"]
     gamePath = "./gameLevels/"
-    gameFiles = ["level1.csv"]
+    gameFiles = ["level1.csv","level2.csv"]
     # app.loadLevels(path, testFiles)
     app.loadLevels(gamePath, gameFiles)
 
