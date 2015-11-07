@@ -8,16 +8,13 @@ EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
 
 #####################################################################
-#####################################################################
 ######################        Data Types        #####################
-#####################################################################
 #####################################################################
 
 class Coordinate:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-
 
 class Level:
     def __init__(self, width,height,layout):
@@ -35,9 +32,7 @@ class Tree:
         self.right = None
 
 #####################################################################
-#####################################################################
 ######################        App Class        ######################
-#####################################################################
 #####################################################################
 
 class App:
@@ -91,9 +86,7 @@ class App:
         self.root.mainloop()
 
 #####################################################################
-#####################################################################
 ######################      Player Class       ######################
-#####################################################################
 #####################################################################
 
 class Player:
@@ -140,9 +133,7 @@ class Player:
         self.isHoldingBlock = False
 
 #####################################################################
-#####################################################################
 ####################        Solver Class        #####################
-#####################################################################
 #####################################################################
 
 class Solver:
@@ -158,10 +149,10 @@ class Solver:
             "fw": [[0,0,0,4],[0,0,1,4],[0,0,2,4]],
             "nw": [[0,0,1,3],[0,0,2,3]],
             "ne": [[0,0,4,1],[0,0,4,2]],
-            "pickup": [[0,0,4,2],[0,0,2,3]],
-            "drop": [[0,0,4,0], [0,0,0,3]],
-            "fall": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
-                            [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]],
+            "pu": [[0,0,4,2],[0,0,2,3]],
+            "dr": [[0,0,4,0], [0,0,0,3]],
+            "fa": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
+                            [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         }
 
         ## Victory Moves
@@ -170,8 +161,8 @@ class Solver:
             "w":    [[0,0,5,3]],
             "nw":   [[5,0,1,3],[5,0,2,3]],
             "ne":   [[0,5,4,1],[0,5,4,2]],
-            "fall": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
-                        [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]],
+            "fa": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
+                        [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]]
         }
         self.obstacleFlag = False
         self.obstacleHeight = 0
@@ -184,8 +175,7 @@ class Solver:
         self.moveList = []
     
     def prettyPrintLevel(self):
-        lower = 0
-        upper = 0
+        lower, uppper = 0, 0
         temp = []
         length = len(self.level.layout)
         for i in range(0, length/self.level.width):
@@ -201,15 +191,15 @@ class Solver:
         self.currentLevel = Level(self.level.width, self.level.height, list(self.level.layout) )
         self.length = len(self.level.layout)
         self.moveFuncs = {  #These depend on properties of the level, so define it after they are set
-            "fall"  : [self.player.fall, self.level.width],
+            "fa"    : [self.player.fall, self.level.width],
             "w"     : [self.player.moveWest, None],
             "e"     : [self.player.moveEast, None],
             "nw"    : [self.player.moveNWest, self.level.width],
             "ne"    : [self.player.moveNEast, self.level.width],
             "fw"    : [self.player.setDirection, WEST],
             "fe"    : [self.player.setDirection, EAST],
-            "pickup": [self.player.pickupBlock, None],
-            "drop"  : [self.player.dropBlock, None],
+            "pu"    : [self.player.pickupBlock, None],
+            "dr"    : [self.player.dropBlock, None],
         }
 
     def locateStartAndGoalState(self):
@@ -248,9 +238,6 @@ class Solver:
         level.layout[oldIndex] = 0
         level.layout[self.player.index] = self.player.dir
 
-    # check the block in front of player
-    # if there is a brick, check the space above it
-    # while you scan forward, check down to see if there is a drop off
     def checkObstaclesHelper(self, prevHeight, height, depth, index):
         if height - prevHeight > 1:
             self.obstacleFlag = True
@@ -327,7 +314,6 @@ class Solver:
 
     def generateMoveQuads(self):
         i,l,w = self.player.index, self.level.layout, self.level.width
-        pg = []
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         self.moveQuadrants = []
         self.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
@@ -338,16 +324,15 @@ class Solver:
     def analyzeMoveQuads(self, move):
         for k,v in self.validMoves.iteritems():
             if move in v:
-                if k == "pickup" and not self.player.isHoldingBlock:
+                if k == "pu" and not self.player.isHoldingBlock:
                     self.quadMoves.append(k)
-                elif k == "drop" and self.player.isHoldingBlock:
+                elif k == "dr" and self.player.isHoldingBlock:
                     self.quadMoves.append(k)
-                elif k != "drop" or k!= "pickup":
+                elif k != "dr" or k!= "pu":
                     self.quadMoves.append(k)
 
     def selectMove(self, moveCode):
         print moveCode
-        print self.closest
         self.performMove(self.level, self.moveFuncs[moveCode][0], self.moveFuncs[moveCode][1])
         self.moveList.append(moveCode)
 
@@ -365,14 +350,13 @@ class Solver:
 
     def solveObstacle(self):
         self.findClosestBlock()
-        playerWest = self.player.index - 1
-        playerEast = self.player.index + 1
+        playerWest, playerEast = self.player.index - 1, self.player.index + 1
         playerAdj = playerWest if self.player.dir == WEST else playerEast
         if self.player.isHoldingBlock:
             if playerAdj in self.blockGoals:
                 self.level.layout[playerAdj] = BLCK
                 self.blockLocs.append(playerAdj)
-                self.selectMove("drop")
+                self.selectMove("dr")
                 self.obstacleFlag = False
                 self.checkObstacles(self.level)
 
@@ -388,9 +372,9 @@ class Solver:
                 elif self.closest > 0:  #block is to the east
                     self.prioritizeEast()
 
-        elif "pickup" in self.quadMoves and playerAdj not in self.blockGoals:
+        elif "pu" in self.quadMoves and playerAdj not in self.blockGoals:
             self.level.layout[playerAdj] = EMPY
-            self.selectMove("pickup")
+            self.selectMove("pu")
             self.blockLocs.remove(playerAdj)
         elif self.closest < 0:  #block is to the west
             self.prioritizeWest()
@@ -398,9 +382,9 @@ class Solver:
             self.prioritizeEast()
 
     def pickMove(self):
-        if "fall" in self.quadMoves: # if fall is a valid move, it must be chosen.
+        if "fa" in self.quadMoves: # if fall is a valid move, it must be chosen.
             self.player.falling = True
-            self.selectMove("fall")
+            self.selectMove("fa")
 
         elif not self.obstacleFlag: # no obstables, pick moves that will get you closer to goal
             self.player.falling = False
@@ -438,35 +422,28 @@ class Solver:
     def stepThroughSolution(self):
         print(self.moveList)
         currentMove = self.moveList.pop(0)
-        if currentMove == "drop":
+        if currentMove == "dr":
             if self.player.dir == WEST:
                 self.currentLevel.layout[self.player.index - 1] = BLCK
             else:
                 self.currentLevel.layout[self.player.index + 1] = BLCK
-
         self.performMove(self.currentLevel, self.moveFuncs[currentMove][0], self.moveFuncs[currentMove][1])
 
-
-#####################################################################
 #####################################################################
 ####################         Program Loop        ####################
-#####################################################################
 #####################################################################
 
 if __name__=='__main__':
     root = Tk()
     app = App(root)
-    path = "./testLevels/"
+    path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv",
                  "level5.csv","level6.csv","level7.csv","level8.csv"]
-    gamePath = "./gameLevels/"
     gameFiles = ["level1.csv","level2.csv"]
     # app.loadLevels(path, testFiles)
     app.loadLevels(gamePath, gameFiles)
-
     numLevels = len(app.levels)
 
-    # This code will begin to run after the gui is rendered
     def startFunction():
         for i in range(0, numLevels):
             solver = Solver()
