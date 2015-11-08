@@ -206,10 +206,54 @@ class Solver:
         level.layout[oldIndex] = 0
         level.layout[s.player.index] = s.player.dir
 
+    def calculateBlocksRequired(s):
+        s.blocksRequired = 0
+        s.blockGoals = []
+        print s.obstacleIndex
+        # print s.player.index
+        tempI = s.obstacleIndex + (s.level.width)
+        reset = 0
+        for i in range (1, s.obstacleHeight):
+            for j in range (1, i+1):
+                reset += s.modifier
+                tempI -= s.modifier
+                print tempI
+                if s.level.layout[tempI] != BRCK:
+                    s.blockGoals.append(tempI)
+                    s.blocksRequired += 1
+            tempI += s.level.width + reset
+        print s.blocksRequired
+        print s.blockGoals
+        print s.blockLocs
+
+    def findBlocks(s, level):
+        tempX = s.obstacleIndex % level.width
+        s.availableBlocks = 0
+        s.blockLocs = []
+        for i in range (1, level.height+1):
+            endRow = i * level.width
+            for j in range (tempX, endRow):
+                if level.layout[j] == BLCK:
+                    # print j
+                    s.blockLocs.append(j)
+                    s.availableBlocks += 1
+            tempX += level.width
+        # print s.availableBlocks
+
+    def findClosestSubgoal(s, priority, restriction):
+        s.closest = sys.maxint
+        for i in range(0,len(priority)):
+            if priority[i] not in restriction:
+                dist = (priority[i] % s.level.width) - (s.player.index % s.level.width)
+                if abs(dist) < s.closest and dist != 0:
+                    s.closest = dist
+
     def checkObstaclesHelper(s, prevHeight, height, depth, index):
-        if height - prevHeight > 1:
+        if (height + 1) - prevHeight > 1:
+            print "index: ", index
+            print "height: ", height + 1
             s.obstacleFlag = True
-            s.obstacleHeight, s.obstableIndex = height, index
+            s.obstacleHeight, s.obstacleIndex = height + 1, index
             if depth >= 2:
                 s.trapFlag = True
         if index % s.level.width ==  0 or index < 0 or index > s.length or s.level.layout[index] == DOOR:
@@ -231,43 +275,13 @@ class Solver:
         elif s.level.layout[index] == BRCK or s.level.layout[index] == BLCK:
             spaceAbove = s.level.layout[index - s.level.width]
             if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
-                newIndex = index -  (height * s.level.width)
+                newIndex = index -  s.level.width
                 s.checkObstaclesHelper(prevHeight, height+1, 0, newIndex)
             elif spaceAbove == EMPY: # move forward when the block above is empty 
                 newIndex = index  +  s.modifier
                 s.checkObstaclesHelper(height+1, 0, 0, newIndex)
             elif spaceAbove == DOOR:
                 return
-    
-    def calculateBlocksRequired(s):
-        s.blocksRequired = 0
-        for i in range (1, s.obstacleHeight):
-            tempI = s.obstableIndex - (i * s.modifier)
-            for j in range (i, s.obstacleHeight):
-                tempI += s.level.width
-                if s.level.layout[tempI] == EMPY:
-                    s.blockGoals.append(tempI)
-                    s.blocksRequired += 1
-    
-    def findBlocks(s, level):
-        tempI = s.obstableIndex - 1
-        tempX = tempI % level.width
-        s.availableBlocks = 0
-        for i in range (1, level.height+1):
-            endRow = i * level.width
-            for j in range (tempX, endRow):
-                if level.layout[j] == BLCK:
-                    s.blockLocs.append(j)
-                    s.availableBlocks += 1
-            tempX += level.width
-
-    def findClosestSubgoal(s, priority, restriction):
-        s.closest = sys.maxint
-        for i in range(0,len(priority)):
-            if priority[i] not in restriction:
-                dist = (priority[i] % s.level.width) - (s.player.index % s.level.width)
-                if abs(dist) < s.closest:
-                    s.closest = dist
 
     def checkObstacles(s, level):
         s.taxiCabDistance()
@@ -320,7 +334,7 @@ class Solver:
         playerWest, playerEast = s.player.index - 1, s.player.index + 1
         playerAdj = playerWest if s.player.dir == WEST else playerEast
         if s.player.isHoldingBlock:
-            if playerAdj in s.blockGoals:
+            if playerAdj in s.blockGoals and playerAdj not in s.blockLocs:
                 s.level.layout[playerAdj] = BLCK
                 s.blockLocs.append(playerAdj)
                 s.selectMove("dr")
@@ -379,10 +393,14 @@ if __name__=='__main__':
     root = Tk()
     app = App(root)
     path, gamePath = "./testLevels/", "./gameLevels/"
-    testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv",
-                 "level5.csv","level6.csv","level7.csv","level8.csv"]
+    testFiles = [
+    #"level1.csv", "level2.csv",
+    "level3.csv",
+    # "level4.csv"
+    ]
+        # ,"level5.csv","level6.csv","level7.csv","level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
-    # app.loadLevels(path, testFiles)
+    app.loadLevels(path, testFiles)
     app.loadLevels(gamePath, gameFiles)
 
     def startFunction():
