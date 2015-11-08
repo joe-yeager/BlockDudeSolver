@@ -18,6 +18,21 @@ class Level:
     def __init__(s, width,height,layout):
         s.width, s.height, s.layout = width, height, layout
 
+    def copy(s, level):
+        s.width = level.width
+        s.height = level.height
+        s.layout = level.layout
+
+class Tree:
+    def __init__(s):
+        s.move = None
+        s.moveList = []
+        s.level = None
+        s.player = None
+        s.left = None
+        s.middle = None
+        s.right = None
+
 #####################################################################
 ######################        App Class        ######################
 #####################################################################
@@ -79,6 +94,13 @@ class Player:
         s.dir, s.index = 0, 0
         s.isHoldingBlock, s.falling = False, False
 
+    def copy(s, player):
+        s.setPos(player.pos.x, player.pos.y)
+        s.dir = player.dir
+        s.index = player.index
+        s.isHoldingBlock = player.isHoldingBlock
+        s.falling = player.falling
+
     def setPos(s,x,y):
         s.pos.x, s.pos.y = x, y
 
@@ -119,8 +141,8 @@ class Player:
 class Solver:
     def __init__(s):
         
-        s.player = Player()
         s.victory = False;
+        s.decisionTree = Tree()
         s.validMoves = {
             "e": [[0,0,4,0]],
             "w": [[0,0,0,3]],
@@ -158,36 +180,28 @@ class Solver:
             lower += s.level.width
 
     def setLevel(s,level):
+        s.decisionTree.level = Level(level.width,level.height,list(level.layout) )
         s.level = Level(level.width,level.height,list(level.layout) )
         s.currentLevel = Level(s.level.width, s.level.height, list(s.level.layout) )
         s.length = len(s.level.layout)
-        s.moveFuncs = {  #These depend on properties of the level, so define it after they are set
-            "fa"    : [s.player.fall, s.level.width],
-            "w"     : [s.player.moveWest, None],
-            "e"     : [s.player.moveEast, None],
-            "nw"    : [s.player.moveNWest, s.level.width],
-            "ne"    : [s.player.moveNEast, s.level.width],
-            "fw"    : [s.player.setDirection, WEST],
-            "fe"    : [s.player.setDirection, EAST],
-            "pu"    : [s.player.pickupBlock, None],
-            "dr"    : [s.player.dropBlock, None],
-        }
+        s.decisionTree.player = Player()
+
 
     def locateStartAndGoalState(s):
         s.goalPos = Coordinate(-1,-1)
-        s.player.setPos(-1,-1)
+        s.decisionTree.player.setPos(-1,-1)
         for i in range(0,s.length):
             if s.level.layout[i] == DOOR:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
                 s.goalPos = Coordinate(x,y)
             elif s.level.layout[i] == WEST or s.level.layout[i] == EAST:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
-                s.player.setPos(x,y)
-                s.player.index,s.player.index2 = i,i
-                s.player.setDirection(s.level.layout[i])
+                s.decisionTree.player.setPos(x,y)
+                s.decisionTree.player.index,s.decisionTree.player.index2 = i,i
+                s.decisionTree.player.setDirection(s.level.layout[i])
 
     def taxiCabDistance(s):
-        s.taxiCab = Coordinate(s.goalPos.x-s.player.pos.x, s.goalPos.y-s.player.pos.y)
+        s.taxiCab = Coordinate(s.goalPos.x-s.decisionTree.player.pos.x, s.goalPos.y-s.decisionTree.player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
     def checkVictory(s, move):
@@ -197,105 +211,7 @@ class Solver:
                 s.victory = True
                 break
 
-    def performMove(s,level, move, arg=None):
-        oldIndex = s.player.index
-        if arg == None:
-            move()
-        else:
-            move(arg)
-        level.layout[oldIndex] = 0
-        level.layout[s.player.index] = s.player.dir
-
-    def calculateBlocksRequired(s):
-        s.blocksRequired = 0
-        s.blockGoals = []
-        print s.obstacleIndex
-        # print s.player.index
-        tempI = s.obstacleIndex + (s.level.width)
-        reset = 0
-        for i in range (1, s.obstacleHeight):
-            for j in range (1, i+1):
-                reset += s.modifier
-                tempI -= s.modifier
-                print tempI
-                if s.level.layout[tempI] != BRCK:
-                    s.blockGoals.append(tempI)
-                    s.blocksRequired += 1
-            tempI += s.level.width + reset
-        print s.blocksRequired
-        print s.blockGoals
-        print s.blockLocs
-
-    def findBlocks(s, level):
-        tempX = s.obstacleIndex % level.width
-        s.availableBlocks = 0
-        s.blockLocs = []
-        for i in range (1, level.height+1):
-            endRow = i * level.width
-            for j in range (tempX, endRow):
-                if level.layout[j] == BLCK:
-                    # print j
-                    s.blockLocs.append(j)
-                    s.availableBlocks += 1
-            tempX += level.width
-        # print s.availableBlocks
-
-    def findClosestSubgoal(s, priority, restriction):
-        s.closest = sys.maxint
-        for i in range(0,len(priority)):
-            if priority[i] not in restriction:
-                dist = (priority[i] % s.level.width) - (s.player.index % s.level.width)
-                if abs(dist) < s.closest and dist != 0:
-                    s.closest = dist
-
-    def checkObstaclesHelper(s, prevHeight, height, depth, index):
-        if (height + 1) - prevHeight > 1:
-            print "index: ", index
-            print "height: ", height + 1
-            s.obstacleFlag = True
-            s.obstacleHeight, s.obstacleIndex = height + 1, index
-            if depth >= 2:
-                s.trapFlag = True
-        if index % s.level.width ==  0 or index < 0 or index > s.length or s.level.layout[index] == DOOR:
-            return
-
-        elif s.level.layout[index] == EMPY:
-            if s.obstacleFlag:
-                return
-            spaceBelow = s.level.layout[index + s.level.width]
-            if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
-                newIndex = index + s.modifier
-                s.checkObstaclesHelper(0, 0, 0, newIndex)
-            elif spaceBelow == EMPY: # If space below is brick/block go down
-                newIndex = index  +  s.level.width
-                s.checkObstaclesHelper(0, 0, depth+1, newIndex)
-            elif spaceBelow == DOOR:
-                return
-
-        elif s.level.layout[index] == BRCK or s.level.layout[index] == BLCK:
-            spaceAbove = s.level.layout[index - s.level.width]
-            if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
-                newIndex = index -  s.level.width
-                s.checkObstaclesHelper(prevHeight, height+1, 0, newIndex)
-            elif spaceAbove == EMPY: # move forward when the block above is empty 
-                newIndex = index  +  s.modifier
-                s.checkObstaclesHelper(height+1, 0, 0, newIndex)
-            elif spaceAbove == DOOR:
-                return
-
-    def checkObstacles(s, level):
-        s.taxiCabDistance()
-        s.obstacleFlag = False
-        s.checkObstaclesHelper(0,0,0,s.player.index + s.modifier)
-        if s.obstacleFlag:
-            s.calculateBlocksRequired()
-            s.findBlocks(level)
-            if s.availableBlocks < s.blocksRequired:
-                print "Level is unsolvable, not enough blocks"
-                s.victory = True
-
-    def generateMoveQuads(s):
-        i,l,w = s.player.index, s.level.layout, s.level.width
+    def generateMoveQuads(s, i, l, w):
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         s.moveQuadrants = []
         s.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
@@ -306,83 +222,130 @@ class Solver:
     def analyzeMoveQuads(s, move):
         for k,v in s.validMoves.iteritems():
             if move in v:
-                if k == "pu" and not s.player.isHoldingBlock:
+                if k == "pu" and not s.decisionTree.player.isHoldingBlock:
                     s.quadMoves.append(k)
-                elif k == "dr" and s.player.isHoldingBlock:
+                elif k == "dr" and s.decisionTree.player.isHoldingBlock:
                     s.quadMoves.append(k)
                 elif k != "dr" or k!= "pu":
                     s.quadMoves.append(k)
 
-    def selectMove(s, moveCode):
+    def performMove(s,level, move, player, arg=None):
+        oldIndex = player.index
+        if arg == None:
+            move()
+        else:
+            move(arg)
+        level.layout[oldIndex] = 0
+        level.layout[player.index] = player.dir
+
+    def applyMove(s, moveCode, level, player):
+        moveFuncs = {  #These depend on properties of the level, so define it after they are set
+            "fa"    : [player.fall, s.level.width],
+            "w"     : [player.moveWest, None],
+            "e"     : [player.moveEast, None],
+            "nw"    : [player.moveNWest, s.level.width],
+            "ne"    : [player.moveNEast, s.level.width],
+            "fw"    : [player.setDirection, WEST],
+            "fe"    : [player.setDirection, EAST],
+            "pu"    : [player.pickupBlock, None],
+            "dr"    : [player.dropBlock, None],
+        }
         print moveCode
-        s.performMove(s.level, s.moveFuncs[moveCode][0], s.moveFuncs[moveCode][1])
-        s.moveList.append(moveCode)
+        s.performMove(level, moveFuncs[moveCode][0], moveFuncs[moveCode][1])
 
-    def prioritizeMoves(s, moveSet):
-        for move in s.quadMoves:
-            if move in moveSet:
-                s.selectMove(move)
-
-    def checkPriority(s, prioritizer):
-        if prioritizer < 0:  #block is to the west
-            s.prioritizeMoves(["w","nw","fw"])
-        else:  #block is to the east
-            s.prioritizeMoves(["e","ne","fe"])
-
-    def solveObstacle(s):
-        s.findClosestSubgoal(s.blockLocs, s.blockGoals)
-        playerWest, playerEast = s.player.index - 1, s.player.index + 1
-        playerAdj = playerWest if s.player.dir == WEST else playerEast
-        if s.player.isHoldingBlock:
-            if playerAdj in s.blockGoals and playerAdj not in s.blockLocs:
-                s.level.layout[playerAdj] = BLCK
-                s.blockLocs.append(playerAdj)
-                s.selectMove("dr")
-                s.checkObstacles(s.level)
-            else:
-                s.findClosestSubgoal(s.blockGoals, s.blockLocs)
-                s.checkPriority(s.closest)
-        elif "pu" in s.quadMoves and playerAdj not in s.blockGoals:
-            s.level.layout[playerAdj] = EMPY
-            s.selectMove("pu")
-            s.blockLocs.remove(playerAdj)
-        else:
-            s.checkPriority(s.closest) 
-
-    def pickMove(s):
+    def pickMove(s, player):
         if "fa" in s.quadMoves: # if fall is a valid move, it must be chosen.
-            s.player.falling = True
-            s.selectMove("fa")
-        elif not s.obstacleFlag: # no obstables, pick moves that will get you closer to goal
-            s.player.falling = False
-            s.checkPriority(s.modifier)
+            s.addToTree(s.decisionTree, "fa")
         else:
-            s.player.falling = False
-            s.solveObstacle()
+            for move in s.quadMoves:
+                if move == "dr":
+                    if player.isHoldingBlock:
+                        s.addToTree(s.decisionTree, move)
+                elif move == "pu":
+                    if not player.isHoldingBlock:
+                        s.addToTree(s.decisionTree, move)
+                else:
+                    s.addToTree(s.decisionTree, move)
         s.quadMoves = []
+
+    def addToTree(s, tree, move):
+        if tree.left == None:
+            tree.left = Tree()
+            cur = tree.left
+            s.addToTreeHelper(cur, tree, move)
+
+        elif tree.middle == None:
+            tree.middle = Tree()
+            cur = tree.middle
+            s.addToTreeHelper(cur, tree, move)
+            
+        elif tree.right == None:
+            tree.right = Tree()
+            cur = tree.right
+            s.addToTreeHelper(cur, tree, move)
+
+        else:
+            sys.exit(1)
+            
+    def addToTreeHelper(s, cur, tree, move):
+        cur.move = move
+        cur.moveList = list(tree.moveList)
+        cur.moveList.append(move)
+        cur.player, cur.level = Player(), Level(0,0,0,)
+        # Copy the parents state
+        cur.player.copy(tree.player)
+        cur.level.copy(tree.level)
+
+    def bdfFilling(s,root, level, move):
+        if root != None:
+            if level == 0:
+                print move
+                s.addToTree(root,move)
+                return
+            s.bdfFilling(root.left, level - 1, move)
+            s.bdfFilling(root.middle, level - 1, move)
+            s.bdfFilling(root.right, level - 1, move)
 
     def solve(s):
         s.locateStartAndGoalState()
-        if s.goalPos.x == -1 or s.player.pos.x == -1:
+        if s.goalPos.x == -1 or s.decisionTree.player.pos.x == -1:
+            print ("Level unsolvable, either door or player is missing (Or both)")
             return
 
-        s.checkObstacles(s.level)
+        i = 0
         while not s.victory:
-            s.generateMoveQuads()
+            s.generateMoveQuads(s.decisionTree.player.index, s.level.layout, s.level.width)
             for move in s.moveQuadrants:
                 s.checkVictory(move)
                 s.analyzeMoveQuads(move)
-            s.pickMove()
+            if "fa" in s.quadMoves:
+                s.addToTree(s.decisionTree, "fa")
+            else:
+                for move in s.quadMoves:
+                    if move == "dr":
+                        if s.decisionTree.player.isHoldingBlock:
+                            s.bdfFilling(s.decisionTree, i, move)
+                    elif move == "pu":
+                        if not s.decisionTree.player.isHoldingBlock:
+                            s.bdfFilling(s.decisionTree, i, move)
+                    else:
+                        s.bdfFilling(s.decisionTree, i, move)
+            
+            s.quadMoves = []
+            i += 1
+
+
         print("Solved!!!")
 
+
     def resetState(s):
-        s.player.index = s.player.index2
+        s.decisionTree.player.index = s.decisionTree.player.index2
 
     def stepThroughSolution(s):
         print(s.moveList)
         currentMove = s.moveList.pop(0)
         if currentMove == "dr":
-            playerAdj = s.player.index - 1 if s.player.dir == WEST else s.player.index + 1
+            playerAdj = s.decisionTree.player.index - 1 if s.decisionTree.player.dir == WEST else s.decisionTree.player.index + 1
             s.currentLevel.layout[playerAdj] = BLCK
         s.performMove(s.currentLevel, s.moveFuncs[currentMove][0], s.moveFuncs[currentMove][1])
 
@@ -417,7 +380,12 @@ if __name__=='__main__':
                 solver.stepThroughSolution()
                 app.displayLevel(solver.currentLevel)
                 time.sleep(0.2)
-            raw_input("Press Enter to begin solving next level")
+            if i != len(app.levels) -1:
+                raw_input("Press Enter to begin solving next level")
+            else:
+                raw_input("Done!  Press enter to exit.")
+
+        sys.exit(0)
 
     root.after(2000, startFunction)
     app.run()
