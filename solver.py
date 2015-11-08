@@ -4,7 +4,12 @@ from PIL import ImageTk
 import csv
 import time
 import math
-EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
+EMPY = 0
+BRCK = 1
+BLCK = 2
+WEST = 3
+EAST = 4
+DOOR = 5
 width, height = 0,0
 
 #####################################################################
@@ -21,7 +26,7 @@ class Level:
     def copy(s, level):
         s.width = level.width
         s.height = level.height
-        s.layout = level.layout
+        s.layout = list(level.layout)
 
 class Node:
     def __init__(s):
@@ -90,13 +95,14 @@ class App:
 class Player:
     def __init__(s):
         s.pos = Coordinate(0,0)
-        s.dir, s.index = 0, 0
+        s.dir, s.index,s.index2 = 0, 0, 0
         s.isHoldingBlock, s.falling = False, False
 
     def copy(s, player):
         s.setPos(player.pos.x, player.pos.y)
         s.dir = player.dir
         s.index = player.index
+        s.index2 = player.index2
         s.isHoldingBlock = player.isHoldingBlock
         s.falling = player.falling
 
@@ -146,9 +152,9 @@ class Solver:
         s.dt[0].moveList = []
 
         s.validMoves = {
-            "e": [[0,0,4,0]],
-            "w": [[0,0,0,3]],
-            "fe": [[0,0,3,0],[0,0,3,1],[0,0,3,2],[0,1,3,1],[0,2,3,1]],
+            "e":  [[0,0,4,0],[4,0,1,1]],
+            "w":  [[0,0,0,3],[0,3,1,1]],
+            "fe": [[0,0,3,0],[0,0,3,1],[0,0,3,2]],
             "fw": [[0,0,0,4],[0,0,1,4],[0,0,2,4]],
             "nw": [[0,0,1,3],[0,0,2,3]],
             "ne": [[0,0,4,1],[0,0,4,2]],
@@ -184,7 +190,7 @@ class Solver:
     def setLevel(s,level):
         s.dt[0].level = Level(level.width,level.height,list(level.layout) )
         s.level = Level(level.width,level.height,list(level.layout) )
-        s.currentLevel = Level(s.level.width, s.level.height, list(s.level.layout) )
+        s.currentLevel = s.dt[0].level
         s.length = len(s.level.layout)
         s.dt[0].player = Player()
 
@@ -210,18 +216,31 @@ class Solver:
         for k,v in s.V.iteritems():
             if move in v:
                 moveList.append(k)
+                s.moveList = list(moveList)
                 s.victory = True
                 break
 
     def generateMoveQuads(s, i, l, w):
+
+        print "i: ", i
+        print "w: ", w
+
+        print l[i-w-1]
+        print l[i-w]
+        print l[i-w+1]
+        print l[i-1]
+        print l[i]
+        print l[i+1]
+        print l[i+w-1]
+        print l[i+w]
+        print l[i+w+1]
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         s.moveQuadrants = []
         s.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
         s.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
         s.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
         s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
-        # print "index: ", i, "  moveQuads: ", s.moveQuadrants
-
+        print "index: ", i, "  moveQuads: ", s.moveQuadrants
 
     def analyzeMoveQuads(s, move, index):
         for k,v in s.validMoves.iteritems():
@@ -231,7 +250,6 @@ class Solver:
                 elif k == "dr" and s.dt[index].player.isHoldingBlock:
                     s.quadMoves.append(k)
                 elif k != "dr" and k != "pu":
-                    print k
                     s.quadMoves.append(k)
 
     def performMove(s,level, player, move, arg=None):
@@ -255,10 +273,20 @@ class Solver:
             "pu"    : [player.pickupBlock, None],
             "dr"    : [player.dropBlock, None],
         }
-        print player.index
         s.performMove(level, player, moveFuncs[moveCode][0], moveFuncs[moveCode][1])
-        print player.index
 
+    def getParentIndex(s):
+        s.par =  int ( math.floor( (s.i - 1) / 3 ) )
+        if s.par < 0:
+            s.par = 0
+
+    def getNthChild(s, index, nthChild):
+        return (3 * index + 1 + nthChild)
+
+    def createDeadSpace(s,numOfSpaces):
+        for i in range(0, numOfSpaces):
+            s.dt.append(None)
+        s.i += numOfSpaces
 
     def addToTree(s, tree, parent, move):
         newChild = Node()
@@ -271,15 +299,36 @@ class Solver:
         s.applyMove(move,newChild.level,newChild.player)
         tree.append(newChild)
 
+    def pickMoves(s):
+        if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
+            print "i: ", s.i, "  parent: ", s.par, "  move: fa"
+            s.getParentIndex()
+            s.addToTree(s.dt, s.dt[s.par], "fa")
+            s.createDeadSpace(2)
+        else:
+            count = 0
+            for move in s.quadMoves:
+                s.getParentIndex()
+                print "i: ", s.i, "  parent: ", s.par, "  move: ", move
+                if s.dt[s.par] == None:
+                    s.createDeadSpace(3)
+                    s.getParentIndex()
+                elif move == "dr":
+                    if s.dt[s.par].player.isHoldingBlock:
+                        s.addToTree(s.dt, s.dt[s.par], move)
+                        count += 1
+                elif move == "pu":
+                    if not s.dt[s.par].player.isHoldingBlock:
+                        s.addToTree(s.dt, s.dt[s.par], move)
+                        count += 1
+                else:
+                    s.addToTree(s.dt, s.dt[s.par], move)
+                    count += 1
+                s.i += 1
 
-    def getParentIndex(s, index):
-        parent = math.floor( (index - 1) / 3 )
-        if parent < 0:
-            parent = 0
-        return int(parent)
-
-    def getNthChild(s, index, nthChild):
-        return (3 * index + 1 + nthChild)
+            if count != 3:
+                dif = 3 - count
+                s.createDeadSpace(dif)
 
     def solve(s):
 
@@ -288,71 +337,49 @@ class Solver:
             print ("Level unsolvable, either door or player is missing(Or both).")
             return
 
-        i = 1
-        parent = s.getParentIndex(i)
-        s.prettyPrintLevel(s.dt[parent].level)
+        s.i = 1
+        s.getParentIndex()
         while not s.victory:
-            if s.dt[parent] == None:
-                i += 3
-                for j in range(0,3):
-                    s.dt.append(None)
-                parent = s.getParentIndex(i)
+            if s.dt[s.par] == None:
+                s.createDeadSpace(3)
+                s.getParentIndex()
             else:
-                s.generateMoveQuads(s.dt[parent].player.index, s.level.layout, s.level.width)
+                print "i: ", s.i, "  parent: ", s.par
+                print s.dt[s.par].moveList
+                s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width)
                 for move in s.moveQuadrants:
-                    s.checkVictory(move, s.dt[parent].moveList)
-                    s.analyzeMoveQuads(move,parent)
-                if "fa" in s.quadMoves:
-                    s.addToTree(s.dt[i], s.dt[parent], "fa")
-                    s.dt.append(None)
-                    s.dt.append(None)
-                    i += 3
-                else:
-                    count = 0
-                    for move in s.quadMoves:
-                        print move
-                        parent = s.getParentIndex(i)
-                        print "i: ", i, "  parent: ", parent, "  move: ", move
-                        if s.dt[parent] == None:
-                            i += 3
-                            for j in range(0,3):
-                                s.dt.append(None)
-                            parent = s.getParentIndex(i)
-                        elif move == "dr":
-                            if s.dt[parent].player.isHoldingBlock:
-                                s.addToTree(s.dt, s.dt[parent], move)
-                                count += 1
-                        elif move == "pu":
-                            if not s.dt[parent].player.isHoldingBlock:
-                                s.addToTree(s.dt, s.dt[parent], move)
-                                count += 1
-                        else:
-                            s.addToTree(s.dt, s.dt[parent], move)
-                            count += 1
-                        i += 1
-
-                    if count != 3:
-                        dif = 3 - count
-                        for j in range(0, dif):
-                            i += 1
-                            s.dt.append(None)
-            
-            s.quadMoves = []
+                    s.checkVictory(move, s.dt[s.par].moveList)
+                    if s.victory:
+                        break
+                    s.analyzeMoveQuads(move,s.par)
+                if not s.victory:
+                    s.pickMoves()
+                s.quadMoves = []
 
 
         print("Solved!!!")
 
-
     def resetState(s):
-        s.dt.player.index = s.dt.player.index2
+        s.dt[0].player.index = s.dt[0].player.index2
 
     def stepThroughSolution(s):
+        moveFuncs = {  #These depend on properties of the level, so define it after they are set
+            "fa"    : [s.dt[0].player.fall, s.level.width],
+            "w"     : [s.dt[0].player.moveWest, None],
+            "e"     : [s.dt[0].player.moveEast, None],
+            "nw"    : [s.dt[0].player.moveNWest, s.level.width],
+            "ne"    : [s.dt[0].player.moveNEast, s.level.width],
+            "fw"    : [s.dt[0].player.setDirection, WEST],
+            "fe"    : [s.dt[0].player.setDirection, EAST],
+            "pu"    : [s.dt[0].player.pickupBlock, None],
+            "dr"    : [s.dt[0].player.dropBlock, None],
+        }
         print(s.moveList)
         currentMove = s.moveList.pop(0)
         if currentMove == "dr":
-            playerAdj = s.dt.player.index - 1 if s.dt.player.dir == WEST else s.dt.player.index + 1
-            s.currentLevel.layout[playerAdj] = BLCK
-        s.performMove(s.currentLevel, s.moveFuncs[currentMove][0], s.moveFuncs[currentMove][1])
+            playerAdj = s.dt[0].player.index - 1 if s.dt[0].player.dir == WEST else s.dt[0].player.index + 1
+            s.dt[0].level.layout[playerAdj] = BLCK
+        s.performMove(s.dt[0].level,s.dt[0].player, moveFuncs[currentMove][0], moveFuncs[currentMove][1])
 
 #####################################################################
 ####################         Program Loop        ####################
@@ -369,7 +396,7 @@ if __name__=='__main__':
     ]
         # ,"level5.csv","level6.csv","level7.csv","level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
-    # app.loadLevels(path, testFiles)
+    app.loadLevels(path, testFiles)
     app.loadLevels(gamePath, gameFiles)
 
     def startFunction():
