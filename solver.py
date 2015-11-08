@@ -3,7 +3,7 @@ from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
 import csv
 import time
-
+import math
 EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
 
@@ -23,15 +23,14 @@ class Level:
         s.height = level.height
         s.layout = level.layout
 
-class Tree:
+class Node:
     def __init__(s):
         s.move = None
         s.moveList = []
         s.level = None
         s.player = None
-        s.left = None
-        s.middle = None
-        s.right = None
+        s.children = []
+
 
 #####################################################################
 ######################        App Class        ######################
@@ -142,7 +141,10 @@ class Solver:
     def __init__(s):
         
         s.victory = False;
-        s.decisionTree = Tree()
+        s.decisionTree = []
+        s.decisionTree.append(Node())
+        s.decisionTree[0].moveList = []
+
         s.validMoves = {
             "e": [[0,0,4,0]],
             "w": [[0,0,0,3]],
@@ -167,47 +169,48 @@ class Solver:
         s.obstacleHeight,s.blocksRequired,s.availableBlocks = 0,0,0
         s.blockGoals, s.blockLocs, s.moveQuadrants,s.moveList,s.quadMoves = [],[],[],[],[]
     
-    def prettyPrintLevel(s):
-        lower, uppper = 0, 0
+    def prettyPrintLevel(s, level):
+        lower, upper = 0, 0
         temp = []
-        length = len(s.level.layout)
-        for i in range(0, length/s.level.width):
-            upper += s.level.width
+        length = len(level.layout)
+        for i in range(0, length/level.width):
+            upper += level.width
             for k in range(lower, upper):
-                temp.append(s.level.layout[k])
+                temp.append(level.layout[k])
             print(temp)
             temp = []
-            lower += s.level.width
+            lower += level.width
 
     def setLevel(s,level):
-        s.decisionTree.level = Level(level.width,level.height,list(level.layout) )
+        s.decisionTree[0].level = Level(level.width,level.height,list(level.layout) )
         s.level = Level(level.width,level.height,list(level.layout) )
         s.currentLevel = Level(s.level.width, s.level.height, list(s.level.layout) )
         s.length = len(s.level.layout)
-        s.decisionTree.player = Player()
+        s.decisionTree[0].player = Player()
 
 
     def locateStartAndGoalState(s):
         s.goalPos = Coordinate(-1,-1)
-        s.decisionTree.player.setPos(-1,-1)
+        s.decisionTree[0].player.setPos(-1,-1)
         for i in range(0,s.length):
             if s.level.layout[i] == DOOR:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
                 s.goalPos = Coordinate(x,y)
             elif s.level.layout[i] == WEST or s.level.layout[i] == EAST:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
-                s.decisionTree.player.setPos(x,y)
-                s.decisionTree.player.index,s.decisionTree.player.index2 = i,i
-                s.decisionTree.player.setDirection(s.level.layout[i])
+                s.decisionTree[0].player.setPos(x,y)
+                s.decisionTree[0].player.index,s.decisionTree[0].player.index2 = i,i
+                s.decisionTree[0].player.setDirection(s.level.layout[i])
 
     def taxiCabDistance(s):
-        s.taxiCab = Coordinate(s.goalPos.x-s.decisionTree.player.pos.x, s.goalPos.y-s.decisionTree.player.pos.y)
+        s.taxiCab = Coordinate(s.goalPos.x-s.decisionTree[0].player.pos.x, s.goalPos.y-s.decisionTree[0].player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
-    def checkVictory(s, move):
+    def checkVictory(s, move, moveList):
         for k,v in s.V.iteritems():
             if move in v:
-                s.moveList.append(k)
+                print "Solved!!"
+                moveList.append(k)
                 s.victory = True
                 break
 
@@ -219,14 +222,15 @@ class Solver:
         s.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
         s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
 
-    def analyzeMoveQuads(s, move):
+    def analyzeMoveQuads(s, move, index):
         for k,v in s.validMoves.iteritems():
             if move in v:
-                if k == "pu" and not s.decisionTree.player.isHoldingBlock:
+                if k == "pu" and not s.decisionTree[index].player.isHoldingBlock:
                     s.quadMoves.append(k)
-                elif k == "dr" and s.decisionTree.player.isHoldingBlock:
+                elif k == "dr" and s.decisionTree[index].player.isHoldingBlock:
                     s.quadMoves.append(k)
-                elif k != "dr" or k!= "pu":
+                elif k != "dr" and k != "pu":
+                    print k
                     s.quadMoves.append(k)
 
     def performMove(s,level, move, player, arg=None):
@@ -250,89 +254,86 @@ class Solver:
             "pu"    : [player.pickupBlock, None],
             "dr"    : [player.dropBlock, None],
         }
-        print moveCode
-        s.performMove(level, moveFuncs[moveCode][0], moveFuncs[moveCode][1])
+        # print moveCode
+        s.performMove(level, moveFuncs[moveCode][0], player, moveFuncs[moveCode][1])
 
-    def pickMove(s, player):
-        if "fa" in s.quadMoves: # if fall is a valid move, it must be chosen.
-            s.addToTree(s.decisionTree, "fa")
-        else:
-            for move in s.quadMoves:
-                if move == "dr":
-                    if player.isHoldingBlock:
-                        s.addToTree(s.decisionTree, move)
-                elif move == "pu":
-                    if not player.isHoldingBlock:
-                        s.addToTree(s.decisionTree, move)
-                else:
-                    s.addToTree(s.decisionTree, move)
-        s.quadMoves = []
-
-    def addToTree(s, tree, move):
-        if tree.left == None:
-            tree.left = Tree()
-            cur = tree.left
-            s.addToTreeHelper(cur, tree, move)
-
-        elif tree.middle == None:
-            tree.middle = Tree()
-            cur = tree.middle
-            s.addToTreeHelper(cur, tree, move)
-            
-        elif tree.right == None:
-            tree.right = Tree()
-            cur = tree.right
-            s.addToTreeHelper(cur, tree, move)
-
-        else:
-            sys.exit(1)
-            
-    def addToTreeHelper(s, cur, tree, move):
-        cur.move = move
-        cur.moveList = list(tree.moveList)
-        cur.moveList.append(move)
-        cur.player, cur.level = Player(), Level(0,0,0,)
+    def addToTree(s, tree, parent, move):
+        newChild = Node()
+        newChild.move = move
+        newChild.moveList = list(parent.moveList)
+        newChild.moveList.append(move)
+        newChild.player, newChild.level = Player(), Level(0,0,0)
         # Copy the parents state
-        cur.player.copy(tree.player)
-        cur.level.copy(tree.level)
+        newChild.player.copy(parent.player)
+        newChild.level.copy(parent.level)
+        s.applyMove(move,newChild.level,newChild.player)
+        s.prettyPrintLevel(newChild.level)
+        tree.append(newChild)
 
-    def bdfFilling(s,root, level, move):
-        if root != None:
-            if level == 0:
-                print move
-                s.addToTree(root,move)
-                return
-            s.bdfFilling(root.left, level - 1, move)
-            s.bdfFilling(root.middle, level - 1, move)
-            s.bdfFilling(root.right, level - 1, move)
+
+    def getParentIndex(s, index):
+        parent = math.floor( (index - 1) / 3 )
+        if parent < 0:
+            parent = 0
+        return int(parent)
+
+    def getNthChild(s, index, nthChild):
+        return (3 * index + 1 + nthChild)
 
     def solve(s):
         s.locateStartAndGoalState()
-        if s.goalPos.x == -1 or s.decisionTree.player.pos.x == -1:
-            print ("Level unsolvable, either door or player is missing (Or both)")
+        if s.goalPos.x == -1 or s.decisionTree[0].player.pos.x == -1:
+            print ("Level unsolvable, either door or player is missing(Or both).")
             return
 
-        i = 0
+        i = 1
+        parent = s.getParentIndex(i)
         while not s.victory:
-            s.generateMoveQuads(s.decisionTree.player.index, s.level.layout, s.level.width)
-            for move in s.moveQuadrants:
-                s.checkVictory(move)
-                s.analyzeMoveQuads(move)
-            if "fa" in s.quadMoves:
-                s.addToTree(s.decisionTree, "fa")
+            if s.decisionTree[parent] == None:
+                i += 3
+                for j in range(0,3):
+                    s.decisionTree.append(None)
+                parent = s.getParentIndex(i)
             else:
-                for move in s.quadMoves:
-                    if move == "dr":
-                        if s.decisionTree.player.isHoldingBlock:
-                            s.bdfFilling(s.decisionTree, i, move)
-                    elif move == "pu":
-                        if not s.decisionTree.player.isHoldingBlock:
-                            s.bdfFilling(s.decisionTree, i, move)
-                    else:
-                        s.bdfFilling(s.decisionTree, i, move)
+                s.generateMoveQuads(s.decisionTree[parent].player.index, s.level.layout, s.level.width)
+                for move in s.moveQuadrants:
+                    s.checkVictory(move,s.decisionTree[parent].moveList)
+                    s.analyzeMoveQuads(move,parent)
+                if "fa" in s.quadMoves:
+                    s.addToTree(s.decisionTree[i], s.decisionTree[parent], "fa")
+                    s.decisionTree.append(None)
+                    s.decisionTree.append(None)
+                    i += 2
+                else:
+                    count = 0
+                    for move in s.quadMoves:
+                        parent = s.getParentIndex(i)
+                        print "i: ", i, "  parent: ", parent, "  move: ", move
+                        if s.decisionTree[parent] == None:
+                            i += 3
+                            for j in range(0,3):
+                                s.decisionTree.append(None)
+                            break
+                        elif move == "dr":
+                            if s.decisionTree[parent].player.isHoldingBlock:
+                                s.addToTree(s.decisionTree, s.decisionTree[parent], move)
+                                count += 1
+                        elif move == "pu":
+                            if not s.decisionTree[parent].player.isHoldingBlock:
+                                s.addToTree(s.decisionTree, s.decisionTree[parent], move)
+                                count += 1
+                        else:
+                            s.addToTree(s.decisionTree, s.decisionTree[parent], move)
+                            count += 1
+                        i += 1
+
+                    if count != len(s.quadMoves):
+                        dif = len(s.quadMoves) - count
+                        for j in range(0, dif):
+                            i += 1
+                            s.decisionTree.append(None)
             
             s.quadMoves = []
-            i += 1
 
 
         print("Solved!!!")
@@ -357,8 +358,9 @@ if __name__=='__main__':
     app = App(root)
     path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = [
-    #"level1.csv", "level2.csv",
-    "level3.csv",
+    "level1.csv", 
+    #"level2.csv",
+    # "level3.csv",
     # "level4.csv"
     ]
         # ,"level5.csv","level6.csv","level7.csv","level8.csv"]
