@@ -144,8 +144,8 @@ class Solver:
     def __init__(s):
         
         s.victory = False;
-        s.dt = []
-        s.dt.append(Node())
+        s.dt = {}
+        s.dt[0] = Node()
         s.dt[0].moveList = []
 
         s.validMoves = {
@@ -363,16 +363,8 @@ class Solver:
         if s.par < 0:
             s.par = 0
 
-    def getGParentIndex(s):
-        s.getParentIndex()
-        s.gp =  int ( math.floor( (s.par - 1) / 3 ) )
-        if s.gp < 0:
-            s.gp = 0
-
-    def createDeadSpace(s,numOfSpaces):
-        for i in range(0, numOfSpaces):
-            s.dt.append(None)
-        s.i += numOfSpaces
+    def getFirstChild(s):
+        s.nth = 3 * s.par + 1
 
     def addToTree(s, tree, parent, move):
         newChild = Node()
@@ -385,22 +377,21 @@ class Solver:
         newChild.blockLocs = list(s.blockLocs)
         newChild.blockGoals = list(s.blockGoals)
         s.performMove(newChild.level,newChild, newChild.player, move)
-        tree.append(newChild)
+        tree[s.i] = newChild
 
     def pickMoves(s):
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
-            # print "i: ", s.i, "  parent: ", s.par, "  move: fa"
+            print "i: ", s.i, "  parent: ", s.par, "  move: fa"
             s.getParentIndex()
             s.addToTree(s.dt, s.dt[s.par], "fa")
-            s.createDeadSpace(2)
+            s.i += 2
         else:
             count = 0
             for move in s.quadMoves:
                 s.getParentIndex()
-                # print "i: ", s.i, "  parent: ", s.par, "  move: ", move
-                if s.dt[s.par] == None:
-                    s.createDeadSpace(3)
-                    s.getParentIndex()
+                print "i: ", s.i, "  parent: ", s.par, "  move: ", move
+                if s.par not in s.dt:
+                    s.i += 3
                 elif move == "dr":
                     playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
                     if s.dt[s.par].player.isHoldingBlock and playerAdj in s.blockGoals:
@@ -441,7 +432,8 @@ class Solver:
 
             if count != 3:
                 dif = 3 - count
-                s.createDeadSpace(dif)
+                s.i += dif
+
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -454,9 +446,9 @@ class Solver:
         s.checkObstacles()
         startTime = time.clock()
         while not s.victory:
-
-            if s.dt[s.par] == None:
-                s.createDeadSpace(3)
+            if s.par not in s.dt:
+                # s.getFirstChild()
+                s.i += 3
             else:
                 s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width,s.dt[s.par].level, s.dt[s.par].moveList)
                 for move in s.moveQuadrants:
