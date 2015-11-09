@@ -398,7 +398,7 @@ class Solver:
                         s.addToTree(s.dt, s.dt[s.par], move)
                         count += 1
                 elif move == "pu":
-                    if not s.dt[s.par].player.isHoldingBlock:
+                    if s.dt[s.par].move != "dr" and not s.dt[s.par].player.isHoldingBlock:
                         s.addToTree(s.dt, s.dt[s.par], move)
                         count += 1
                 elif move == "w":
