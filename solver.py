@@ -113,25 +113,20 @@ class Player:
         s.dir = playerValue
 
     def moveEast(s):
-        s.pos.x += 1
         s.index += 1
 
     def moveWest(s):
-        s.pos.x -= 1
         s.index -= 1
 
     def moveNEast(s, width):
         s.moveEast()
-        s.pos.y += 1
         s.index -= (width)
 
     def moveNWest(s,width):
         s.moveWest()
-        s.pos.y += 1
         s.index -= (width)
 
     def fall(s, width):
-        s.pos.y -= 1;
         s.index += (width)
 
     def pickupBlock(s):
@@ -221,7 +216,6 @@ class Solver:
                 break
 
     def generateMoveQuads(s, i, l, w):
-
         print "i: ", i
         print "w: ", w
 
@@ -242,38 +236,50 @@ class Solver:
         s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
         print "index: ", i, "  moveQuads: ", s.moveQuadrants
 
+    def addMove(s, move):
+        if move not in s.quadMoves:
+            s.quadMoves.append(move)
+
     def analyzeMoveQuads(s, move, index):
         for k,v in s.validMoves.iteritems():
             if move in v:
                 if k == "pu" and not s.dt[index].player.isHoldingBlock:
-                    s.quadMoves.append(k)
+                    s.addMove(k)
                 elif k == "dr" and s.dt[index].player.isHoldingBlock:
-                    s.quadMoves.append(k)
+                    s.addMove(k)
                 elif k != "dr" and k != "pu":
-                    s.quadMoves.append(k)
+                    s.addMove(k)
 
-    def performMove(s,level, player, move, arg=None):
+    def performMove(s,level, player, move):
         oldIndex = player.index
-        if arg == None:
-            move()
-        else:
-            move(arg)
+
+        if move == "fa":
+            player.fall(s.level.width)
+        elif move == "w":
+            player.moveWest()
+        elif move == "e":
+            player.moveEast()
+        elif move == "nw":
+            player.moveNWest(s.level.width)
+        elif move == "ne":
+            player.moveNEast(s.level.width)
+        elif move == "fw":
+            player.setDirection(WEST)
+        elif move == "fe":
+            player.setDirection(EAST)
+        elif move == "pu":
+            player.pickupBlock()
+        elif move == "dr":
+            player.dropBlock
+
         level.layout[oldIndex] = 0
         level.layout[player.index] = player.dir
 
     def applyMove(s, moveCode, level, player):
-        moveFuncs = {  #These depend on properties of the level, so define it after they are set
-            "fa"    : [player.fall, s.level.width],
-            "w"     : [player.moveWest, None],
-            "e"     : [player.moveEast, None],
-            "nw"    : [player.moveNWest, s.level.width],
-            "ne"    : [player.moveNEast, s.level.width],
-            "fw"    : [player.setDirection, WEST],
-            "fe"    : [player.setDirection, EAST],
-            "pu"    : [player.pickupBlock, None],
-            "dr"    : [player.dropBlock, None],
-        }
-        s.performMove(level, player, moveFuncs[moveCode][0], moveFuncs[moveCode][1])
+        s.prettyPrintLevel(level)
+        print " "
+        s.performMove(level, player, moveCode)
+        s.prettyPrintLevel(level)
 
     def getParentIndex(s):
         s.par =  int ( math.floor( (s.i - 1) / 3 ) )
@@ -342,10 +348,7 @@ class Solver:
         while not s.victory:
             if s.dt[s.par] == None:
                 s.createDeadSpace(3)
-                s.getParentIndex()
             else:
-                print "i: ", s.i, "  parent: ", s.par
-                print s.dt[s.par].moveList
                 s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width)
                 for move in s.moveQuadrants:
                     s.checkVictory(move, s.dt[s.par].moveList)
@@ -356,6 +359,9 @@ class Solver:
                     s.pickMoves()
                 s.quadMoves = []
 
+            s.getParentIndex()
+
+
 
         print("Solved!!!")
 
@@ -363,23 +369,12 @@ class Solver:
         s.dt[0].player.index = s.dt[0].player.index2
 
     def stepThroughSolution(s):
-        moveFuncs = {  #These depend on properties of the level, so define it after they are set
-            "fa"    : [s.dt[0].player.fall, s.level.width],
-            "w"     : [s.dt[0].player.moveWest, None],
-            "e"     : [s.dt[0].player.moveEast, None],
-            "nw"    : [s.dt[0].player.moveNWest, s.level.width],
-            "ne"    : [s.dt[0].player.moveNEast, s.level.width],
-            "fw"    : [s.dt[0].player.setDirection, WEST],
-            "fe"    : [s.dt[0].player.setDirection, EAST],
-            "pu"    : [s.dt[0].player.pickupBlock, None],
-            "dr"    : [s.dt[0].player.dropBlock, None],
-        }
         print(s.moveList)
         currentMove = s.moveList.pop(0)
         if currentMove == "dr":
             playerAdj = s.dt[0].player.index - 1 if s.dt[0].player.dir == WEST else s.dt[0].player.index + 1
             s.dt[0].level.layout[playerAdj] = BLCK
-        s.performMove(s.dt[0].level,s.dt[0].player, moveFuncs[currentMove][0], moveFuncs[currentMove][1])
+        s.performMove(s.dt[0].level,s.dt[0].player, currentMove)
 
 #####################################################################
 ####################         Program Loop        ####################
@@ -390,10 +385,9 @@ if __name__=='__main__':
     path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = [
     "level1.csv", 
-    #"level2.csv",
-    # "level3.csv",
-    # "level4.csv"
-    ]
+    "level2.csv",
+    # "level3.csv"]
+    "level4.csv"]
         # ,"level5.csv","level6.csv","level7.csv","level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
     app.loadLevels(path, testFiles)
