@@ -4,7 +4,7 @@ from PIL import ImageTk
 import csv
 import time
 import math
-
+from collections import OrderedDict
 EMPY = 0
 BRCK = 1
 BLCK = 2
@@ -37,6 +37,7 @@ class Node:
         s.player = None
         s.blockLocs = None
         s.blockGoals = None
+        s.children = []
 
 
 #####################################################################
@@ -144,10 +145,10 @@ class Solver:
     def __init__(s):
         
         s.victory = False;
-        s.dt = {}
+        s.dt = OrderedDict()
         s.dt[0] = Node()
         s.dt[0].moveList = []
-
+        s.getChildren(0)
         s.validMoves = {
             "e":  [[0,0,4,0]],
             "w":  [[0,0,0,3]],
@@ -363,6 +364,17 @@ class Solver:
         if s.par < 0:
             s.par = 0
 
+    def getNthChild(s,index, nth):
+        return 3 * index + 1 + nth
+
+    def getChildren(s,index):
+        s.dt[index].children = [
+                                s.getNthChild(index,0),
+                                s.getNthChild(index, 1),
+                                s.getNthChild(index, 2)
+                                ]
+
+
     def getFirstChild(s):
         s.nth = 3 * s.par + 1
 
@@ -458,6 +470,8 @@ class Solver:
                     s.analyzeMoveQuads(move,s.par)
                 if not s.victory:
                     s.pickMoves()
+                else:
+                    break
                 s.quadMoves = []
 
             s.getParentIndex()
