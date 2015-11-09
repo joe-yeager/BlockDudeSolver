@@ -4,6 +4,7 @@ from PIL import ImageTk
 import csv
 import time
 import math
+
 EMPY = 0
 BRCK = 1
 BLCK = 2
@@ -147,14 +148,14 @@ class Solver:
         s.dt[0].moveList = []
 
         s.validMoves = {
-            "e":  [[0,0,4,0],[4,0,1,1]],
-            "w":  [[0,0,0,3],[0,3,1,1]],
-            "fe": [[0,0,3,0],[0,0,3,1],[0,0,3,2]],
-            "fw": [[0,0,0,4],[0,0,1,4],[0,0,2,4]],
+            "e":  [[0,0,4,0]],
+            "w":  [[0,0,0,3]],
+            "fe": [[0,0,3,0],[0,0,3,1],[0,0,3,2],[0,1,3,1],[0,2,3,2],[0,2,3,1],[0,1,3,2]],
+            "fw": [[0,0,0,4],[0,0,1,4],[0,0,2,4],[1,0,1,4],[2,0,2,4],[2,0,1,4],[2,0,1,4]],
             "nw": [[0,0,1,3],[0,0,2,3]],
             "ne": [[0,0,4,1],[0,0,4,2]],
             "pu": [[0,0,4,2],[0,0,2,3]],
-            "dr": [[0,0,4,0], [0,0,0,3]],
+            "dr": [[0,0,4,0], [0,0,0,3],[0,0,4,1], [0,0,1,3],[0,0,4,2], [0,0,2,3]],
             "fa": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                             [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         }
@@ -203,8 +204,8 @@ class Solver:
                 s.dt[0].player.index,s.dt[0].player.index2 = i,i
                 s.dt[0].player.setDirection(s.level.layout[i])
 
-    def taxiCabDistance(s):
-        s.taxiCab = Coordinate(s.goalPos.x-s.dt[0].player.pos.x, s.goalPos.y-s.dt[0].player.pos.y)
+    def taxiCabDistance(s, player):
+        s.taxiCab = Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
     def checkVictory(s, move, moveList):
@@ -214,6 +215,94 @@ class Solver:
                 s.moveList = list(moveList)
                 s.victory = True
                 break
+
+    def calculateBlocksRequired(s):
+            s.blocksRequired = 0
+            s.blockGoals = []
+            print s.obstacleIndex
+            # print s.player.index
+            tempI = s.obstacleIndex + (s.level.width)
+            reset = 0
+            for i in range (1, s.obstacleHeight):
+                for j in range (1, i+1):
+                    reset += s.modifier
+                    tempI -= s.modifier
+                    print tempI
+                    if s.level.layout[tempI] != BRCK:
+                        s.blockGoals.append(tempI)
+                        s.blocksRequired += 1
+                tempI += s.level.width + reset
+            print s.blocksRequired
+            print s.blockGoals
+            print s.blockLocs
+
+    def findBlocks(s, level):
+        tempX = s.obstacleIndex % level.width
+        s.availableBlocks = 0
+        s.blockLocs = []
+        for i in range (1, level.height+1):
+            endRow = i * level.width
+            for j in range (tempX, endRow):
+                if level.layout[j] == BLCK:
+                    # print j
+                    s.blockLocs.append(j)
+                    s.availableBlocks += 1
+            tempX += level.width
+        # print s.availableBlocks
+
+    def findClosestSubgoal(s, priority, restriction):
+        s.closest = sys.maxint
+        for i in range(0,len(priority)):
+            if priority[i] not in restriction:
+                dist = (priority[i] % s.level.width) - (s.player.index % s.level.width)
+                if abs(dist) < s.closest and dist != 0:
+                    s.closest = dist
+
+    def checkObstaclesHelper(s, prevHeight, height, depth, index):
+        if (height + 1) - prevHeight > 1:
+            print "index: ", index
+            print "height: ", height + 1
+            s.obstacleFlag = True
+            s.obstacleHeight, s.obstacleIndex = height + 1, index
+            if depth >= 2:
+                s.trapFlag = True
+        if index % s.level.width ==  0 or index < 0 or index > s.length or s.level.layout[index] == DOOR:
+            return
+
+        elif s.level.layout[index] == EMPY:
+            if s.obstacleFlag:
+                return
+            spaceBelow = s.level.layout[index + s.level.width]
+            if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
+                newIndex = index + s.modifier
+                s.checkObstaclesHelper(0, 0, 0, newIndex)
+            elif spaceBelow == EMPY: # If space below is brick/block go down
+                newIndex = index  +  s.level.width
+                s.checkObstaclesHelper(0, 0, depth+1, newIndex)
+            elif spaceBelow == DOOR:
+                return
+
+        elif s.level.layout[index] == BRCK or s.level.layout[index] == BLCK:
+            spaceAbove = s.level.layout[index - s.level.width]
+            if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
+                newIndex = index -  s.level.width
+                s.checkObstaclesHelper(prevHeight, height+1, 0, newIndex)
+            elif spaceAbove == EMPY: # move forward when the block above is empty 
+                newIndex = index  +  s.modifier
+                s.checkObstaclesHelper(height+1, 0, 0, newIndex)
+            elif spaceAbove == DOOR:
+                return
+
+    def checkObstacles(s, level):
+        s.taxiCabDistance()
+        s.obstacleFlag = False
+        s.checkObstaclesHelper(0,0,0,s.player.index + s.modifier)
+        if s.obstacleFlag:
+            s.calculateBlocksRequired()
+            s.findBlocks(level)
+            if s.availableBlocks < s.blocksRequired:
+                print "Level is unsolvable, not enough blocks"
+                s.victory = True
 
     def generateMoveQuads(s, i, l, w):
         print "i: ", i
@@ -234,7 +323,7 @@ class Solver:
         s.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
         s.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
         s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
-        print "index: ", i, "  moveQuads: ", s.moveQuadrants
+        # print "index: ", i, "  moveQuads: ", s.moveQuadrants
 
     def addMove(s, move):
         if move not in s.quadMoves:
@@ -276,18 +365,15 @@ class Solver:
         level.layout[player.index] = player.dir
 
     def applyMove(s, moveCode, level, player):
-        s.prettyPrintLevel(level)
-        print " "
+        # s.prettyPrintLevel(level)
+        # print " "
         s.performMove(level, player, moveCode)
-        s.prettyPrintLevel(level)
+        # s.prettyPrintLevel(level)
 
     def getParentIndex(s):
         s.par =  int ( math.floor( (s.i - 1) / 3 ) )
         if s.par < 0:
             s.par = 0
-
-    def getNthChild(s, index, nthChild):
-        return (3 * index + 1 + nthChild)
 
     def createDeadSpace(s,numOfSpaces):
         for i in range(0, numOfSpaces):
@@ -307,7 +393,7 @@ class Solver:
 
     def pickMoves(s):
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
-            print "i: ", s.i, "  parent: ", s.par, "  move: fa"
+            # print "i: ", s.i, "  parent: ", s.par, "  move: fa"
             s.getParentIndex()
             s.addToTree(s.dt, s.dt[s.par], "fa")
             s.createDeadSpace(2)
