@@ -148,7 +148,7 @@ class Solver:
         s.dt = OrderedDict()
         s.dt[0] = Node()
         s.dt[0].moveList = []
-        s.getChildren(0)
+        s.dt[0].children = s.getChildren(0)
         s.validMoves = {
             "e":  [[0,0,4,0]],
             "w":  [[0,0,0,3]],
@@ -368,17 +368,10 @@ class Solver:
         return 3 * index + 1 + nth
 
     def getChildren(s,index):
-        s.dt[index].children = [
-                                s.getNthChild(index,0),
-                                s.getNthChild(index, 1),
-                                s.getNthChild(index, 2)
-                                ]
-
-
-    def getFirstChild(s):
-        s.nth = 3 * s.par + 1
+        return [ s.getNthChild(index,0), s.getNthChild(index, 1), s.getNthChild(index, 2)]
 
     def addToTree(s, tree, parent, move):
+        s.i = s.dt[s.par].children.pop(0)
         newChild = Node()
         newChild.move = move
         newChild.moveList = list(parent.moveList)
@@ -386,6 +379,7 @@ class Solver:
         newChild.player, newChild.level = Player(), Level(0,0,0)
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
+        newChild.children = s.getChildren(s.i)
         newChild.blockLocs = list(s.blockLocs)
         newChild.blockGoals = list(s.blockGoals)
         s.performMove(newChild.level,newChild, newChild.player, move)
@@ -394,58 +388,39 @@ class Solver:
     def pickMoves(s):
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
             print "i: ", s.i, "  parent: ", s.par, "  move: fa"
-            s.getParentIndex()
             s.addToTree(s.dt, s.dt[s.par], "fa")
-            s.i += 2
         else:
-            count = 0
             for move in s.quadMoves:
-                s.getParentIndex()
-                print "i: ", s.i, "  parent: ", s.par, "  move: ", move
-                if s.par not in s.dt:
-                    s.i += 3
-                elif move == "dr":
+                # s.getParentIndex()
+                print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: ", move
+                if move == "dr":
                     playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
                     if s.dt[s.par].player.isHoldingBlock and playerAdj in s.blockGoals:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "pu":
                     if s.dt[s.par].move != "dr" and not s.dt[s.par].player.isHoldingBlock:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "w":
                     if s.dt[s.par].move != "e" and s.dt[s.par].player.dir == WEST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "nw":
                     if s.dt[s.par].player.dir == WEST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "e":
                     if s.dt[s.par].move != "e" and s.dt[s.par].player.dir == EAST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "ne":
                     if s.dt[s.par].player.dir == EAST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "fe":
                     if s.dt[s.par].move != "fw" and s.dt[s.par].player.dir == WEST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 elif move == "fw":
                     if s.dt[s.par].move != "fe" and s.dt[s.par].player.dir == EAST:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                        count += 1
                 else:
                     s.addToTree(s.dt, s.dt[s.par], move)
-                    count += 1
-                s.i += 1
-
-            if count != 3:
-                dif = 3 - count
-                s.i += dif
-
+        s.index += 1
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -454,14 +429,15 @@ class Solver:
             return
 
         s.i = 1
-        s.getParentIndex()
+        # s.getParentIndex()
         s.checkObstacles()
         startTime = time.clock()
+        bottom = 0
         while not s.victory:
-            if s.par not in s.dt:
-                # s.getFirstChild()
-                s.i += 3
-            else:
+            s.index = bottom
+            for i in range(bottom, len(s.dt) ):
+                s.par = s.dt.keys()[s.index]
+                print  "par: ", s.par
                 s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width,s.dt[s.par].level, s.dt[s.par].moveList)
                 for move in s.moveQuadrants:
                     s.checkVictory(move, s.dt[s.par].moveList)
@@ -474,7 +450,9 @@ class Solver:
                     break
                 s.quadMoves = []
 
-            s.getParentIndex()
+                # s.getParentIndex()
+                bottom = s.index
+
         endTime = time.clock()
         print "Time taken(secs): ", endTime - startTime
         print("Solved!!!")
@@ -531,6 +509,6 @@ if __name__=='__main__':
                 raw_input("Done!  Press enter to exit.")
 
         sys.exit(0)
-
+    startFunction()
     root.after(500, startFunction)
-    app.run()
+    # app.run()
