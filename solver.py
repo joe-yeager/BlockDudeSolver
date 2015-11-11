@@ -284,14 +284,14 @@ class Solver:
             elif spaceAbove == DOOR:
                 return
 
-    def checkObstacles(s):
+    def checkObstacles(s, index):
         s.obstacleIndices = []
-        s.taxiCabDistance(s.dt[0].player)
+        s.taxiCabDistance(s.dt[index].player)
         s.obstacleFlag = False
-        s.checkObstaclesHelper(0,0,0,s.dt[0].player.index + s.modifier, s.dt[0].level)
+        s.checkObstaclesHelper(0,0,0, s.dt[index].player.index + s.modifier, s.dt[index].level)
         if s.obstacleFlag:
             s.calculateBlocksRequired()
-            s.findBlocks(s.dt[0].level)
+            s.findBlocks(s.dt[index].level)
             if s.availableBlocks < s.blocksRequired:
                 print "Level is unsolvable, not enough blocks"
                 s.victory = True
@@ -354,7 +354,19 @@ class Solver:
         elif move == "dr":
             player.dropBlock()
             playerAdj = player.index - 1 if player.dir == WEST else player.index + 1
-            level.layout[playerAdj] = BLCK
+            playerDiag = playerAdj + level.width
+            if level.layout[playerDiag] == BLCK or level.layout[playerDiag] == BRCK:
+                level.layout[playerAdj] = BLCK
+            else:
+                while True:
+                    playerDiag += level.width
+                    if level.layout[playerDiag] == BLCK or level.layout[playerDiag] == BRCK:
+                        playerDiag -= level.width
+                        level.layout[playerDiag] = BLCK
+                        break
+
+
+
 
         level.layout[oldIndex] = 0
         level.layout[player.index] = player.dir
@@ -363,6 +375,12 @@ class Solver:
         s.par =  int ( math.floor( (s.i - 1) / 3 ) )
         if s.par < 0:
             s.par = 0
+
+    def getGrandParentIndex(s, index):
+        gp =  int ( math.floor( (index - 1) / 3 ) )
+        if gp < 0:
+            gp = 0
+        return gp
 
     def getNthChild(s,index, nth):
         return 3 * index + 1 + nth
@@ -376,6 +394,7 @@ class Solver:
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)
+        # print "moveList: ", newChild.moveList
         newChild.player, newChild.level = Player(), Level(0,0,0)
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
@@ -385,42 +404,56 @@ class Solver:
         s.performMove(newChild.level,newChild, newChild.player, move)
         tree[s.i] = newChild
 
+    def prioritizeMoves(s, move, moves):
+        if move in moves:
+            s.addToTree(s.dt, s.dt[s.par], move)
+
     def pickMoves(s):
+        gp = s.getGrandParentIndex(s.par)
+        ggp = s.getGrandParentIndex(gp)
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
-            print "i: ", s.i, "  parent: ", s.par, "  move: fa"
+            # print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: fa"
             s.addToTree(s.dt, s.dt[s.par], "fa")
         else:
             for move in s.quadMoves:
-                # s.getParentIndex()
-                print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: ", move
-                if move == "dr":
+                # print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: ", move
+                if not s.obstacleFlag:
+                    s.prioritizeMoves(move,["w","nw","fw"])
+                elif move == "dr":
                     playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
-                    if s.dt[s.par].player.isHoldingBlock and playerAdj in s.blockGoals:
-                        s.addToTree(s.dt, s.dt[s.par], move)
+                    if s.dt[s.par].move != "pu" and s.dt[s.par].player.isHoldingBlock:
+                        if playerAdj in s.blockGoals and s.dt[s.par].level.layout[playerAdj] == EMPY:
+                            s.addToTree(s.dt, s.dt[s.par], move)
+                        # s.checkObstacles(s.i)
                 elif move == "pu":
+                    playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
                     if s.dt[s.par].move != "dr" and not s.dt[s.par].player.isHoldingBlock:
                         s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "w":
-                    if s.dt[s.par].move != "e" and s.dt[s.par].player.dir == WEST:
+                    if s.dt[ggp].move == "fe" and s.dt[gp].move == "e" and s.dt[s.par].move == "fw":
+                        x = 1
+                    else:
                         s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "nw":
-                    if s.dt[s.par].player.dir == WEST:
-                        s.addToTree(s.dt, s.dt[s.par], move)
+                    # if s.dt[s.par].player.dir == WEST:
+                    s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "e":
-                    if s.dt[s.par].move != "e" and s.dt[s.par].player.dir == EAST:
+                    if s.dt[ggp].move == "fw" and s.dt[gp].move == "e" and s.dt[s.par].move == "fe":
+                        x = 1
+                    else:
                         s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "ne":
-                    if s.dt[s.par].player.dir == EAST:
-                        s.addToTree(s.dt, s.dt[s.par], move)
+                    # if s.dt[s.par].player.dir == EAST:
+                    s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "fe":
-                    if s.dt[s.par].move != "fw" and s.dt[s.par].player.dir == WEST:
+                    if s.dt[s.par].move != "fw": # and s.dt[s.par].player.dir == WEST:
                         s.addToTree(s.dt, s.dt[s.par], move)
                 elif move == "fw":
-                    if s.dt[s.par].move != "fe" and s.dt[s.par].player.dir == EAST:
+                    if s.dt[s.par].move != "fe": # and s.dt[s.par].player.dir == EAST:
                         s.addToTree(s.dt, s.dt[s.par], move)
                 else:
                     s.addToTree(s.dt, s.dt[s.par], move)
-        s.index += 1
+        s.blah += 1
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -429,15 +462,14 @@ class Solver:
             return
 
         s.i = 1
-        # s.getParentIndex()
-        s.checkObstacles()
+        s.checkObstacles(0)
         startTime = time.clock()
         bottom = 0
+        s.blah = bottom
         while not s.victory:
-            s.index = bottom
-            for i in range(bottom, len(s.dt) ):
-                s.par = s.dt.keys()[s.index]
-                print  "par: ", s.par
+            lenDt = len(s.dt)
+            for i in range(bottom, lenDt):
+                s.par = s.dt.keys()[s.blah]
                 s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width,s.dt[s.par].level, s.dt[s.par].moveList)
                 for move in s.moveQuadrants:
                     s.checkVictory(move, s.dt[s.par].moveList)
@@ -451,7 +483,7 @@ class Solver:
                 s.quadMoves = []
 
                 # s.getParentIndex()
-                bottom = s.index
+            bottom = s.blah
 
         endTime = time.clock()
         print "Time taken(secs): ", endTime - startTime
@@ -479,15 +511,16 @@ if __name__=='__main__':
     app = App(root)
     path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = [
-    "level1.csv", 
-    "level2.csv",
-    "level3.csv",
-    "level4.csv",
-    "level5.csv"]
-        # ,"level6.csv","level7.csv","level8.csv"]
+    # "level1.csv", 
+    # "level2.csv",
+    # "level3.csv",
+    # "level4.csv",
+    # "level5.csv",
+    "level6.csv"]
+        # "level7.csv","level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
     app.loadLevels(path, testFiles)
-    # app.loadLevels(gamePath, gameFiles)
+    app.loadLevels(gamePath, gameFiles)
 
     def startFunction():
         for i in range(0, len(app.levels)):
@@ -511,4 +544,4 @@ if __name__=='__main__':
         sys.exit(0)
     startFunction()
     root.after(500, startFunction)
-    # app.run()
+    app.run()
