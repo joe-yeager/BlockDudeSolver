@@ -418,16 +418,19 @@ class Solver:
             s.addToTree(s.dt, s.dt[s.par], move)
 
     def checkCycles(s, move):
-        gp = s.getGrandParentIndex(s.par)
-        ggp = s.getGrandParentIndex(gp)
-        moveSeq = [s.dt[ggp].move, s.dt[gp].move, s.dt[s.par].move, move]
-        moveSeq2 = moveSeq[1:]
-        moveSeq3 = moveSeq[2:]
-
         s.isNotACycle = True
-        if moveSeq in s.cyclicalMoves or  moveSeq2 in s.cyclicalMoves or moveSeq3 in s.cyclicalMoves:
-            s.isNotACycle = False
+        gp =  s.getGrandParentIndex(s.par)
+        ggp = s.getGrandParentIndex(gp)
 
+        try:
+            moveSeq = [s.dt[ggp].move, s.dt[gp].move, s.dt[s.par].move, move]
+            moveSeq2 = moveSeq[1:]
+            moveSeq3 = moveSeq[2:]
+
+            if moveSeq in s.cyclicalMoves or  moveSeq2 in s.cyclicalMoves or moveSeq3 in s.cyclicalMoves:
+                s.isNotACycle = False
+        except KeyError:
+            return
     def pickMoves(s):
 
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
@@ -509,11 +512,12 @@ if __name__=='__main__':
     "level3.csv",
     "level4.csv",
     "level5.csv",
-    "level6.csv"]
-        # "level7.csv","level8.csv"]
+    "level6.csv",
+    "level7.csv"]
+        # "level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
     app.loadLevels(path, testFiles)
-    app.loadLevels(gamePath, gameFiles)
+    # app.loadLevels(gamePath, gameFiles)
 
     def startFunction():
         for i in range(0, len(app.levels)):
