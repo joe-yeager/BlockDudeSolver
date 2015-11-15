@@ -157,7 +157,7 @@ class Solver:
             "nw": [[0,0,1,3],[0,0,2,3]],
             "ne": [[0,0,4,1],[0,0,4,2]],
             "pu": [[0,0,4,2],[0,0,2,3]],
-            "dr": [[0,0,4,0], [0,0,0,3],[0,0,4,1], [0,0,1,3],[0,0,4,2], [0,0,2,3]],
+            "dr": [[0,0,4,0], [0,0,0,3],[0,0,4,1]],
             "fa": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
                             [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         }
@@ -169,6 +169,23 @@ class Solver:
             "fa": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
                         [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]]
         }
+        s.cyclicalMoves = [
+            ["w", "fa", "fe", "ne"],
+            ["e", "fa", "fw", "nw"],
+            ["fw", "w", "fe", "e"],
+            ["fe", "e", "fw", "w"],
+            ["w", "w", "fe", "e"],
+            ["e", "e", "fw", "w"],
+            ["w", "fe", "e"],
+            ["e", "fw", "w"],
+            ["ne", "fw", "w"],
+            ["nw", "fe", "e"],
+            ["fw", "fe"],
+            ["fe", "fw"],
+            ["dr", "pu"],
+            ["pu", "dr"]
+        ]
+
         s.obstacleFlag,s.trapFlag = False, False
         s.obstacleHeights = []
         s.blocksRequired = []
@@ -305,10 +322,6 @@ class Solver:
                 break
 
     def generateMoveQuads(s, i, l, w, level, moveList):
-        # print "i: ", i
-        # print "w: ", w
-        # s.prettyPrintLevel(level)
-        # print moveList
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         s.moveQuadrants = []
         s.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
@@ -329,6 +342,12 @@ class Solver:
                     s.addMove(k)
                 elif k != "dr" and k != "pu":
                     s.addMove(k)
+
+    def checkDown(s,index, level):
+        if level.layout[index] != EMPY:
+            index -= level.width
+            return index
+        return s.checkDown(index + level.width, level)
 
     def performMove(s,level,data, player, move):
         oldIndex = player.index
@@ -354,19 +373,9 @@ class Solver:
         elif move == "dr":
             player.dropBlock()
             playerAdj = player.index - 1 if player.dir == WEST else player.index + 1
-            playerDiag = playerAdj + level.width
-            if level.layout[playerDiag] == BLCK or level.layout[playerDiag] == BRCK:
-                level.layout[playerAdj] = BLCK
-            else:
-                while True:
-                    playerDiag += level.width
-                    if level.layout[playerDiag] == BLCK or level.layout[playerDiag] == BRCK:
-                        playerDiag -= level.width
-                        level.layout[playerDiag] = BLCK
-                        break
-
-
-
+            playerAdj = s.checkDown(playerAdj,level)
+            level.layout[playerAdj] = BLCK
+            return 
 
         level.layout[oldIndex] = 0
         level.layout[player.index] = player.dir
@@ -377,10 +386,10 @@ class Solver:
             s.par = 0
 
     def getGrandParentIndex(s, index):
-        gp =  int ( math.floor( (index - 1) / 3 ) )
-        if gp < 0:
-            gp = 0
-        return gp
+        newGP =  int ( math.floor( (index - 1) / 3 ) )
+        if newGP < 0:
+            newGP = 0
+        return newGP
 
     def getNthChild(s,index, nth):
         return 3 * index + 1 + nth
@@ -394,7 +403,7 @@ class Solver:
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)
-        # print "moveList: ", newChild.moveList
+        print "moveList: ", newChild.moveList
         newChild.player, newChild.level = Player(), Level(0,0,0)
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
@@ -408,52 +417,44 @@ class Solver:
         if move in moves:
             s.addToTree(s.dt, s.dt[s.par], move)
 
-    def pickMoves(s):
+    def checkCycles(s, move):
         gp = s.getGrandParentIndex(s.par)
         ggp = s.getGrandParentIndex(gp)
+        moveSeq = [s.dt[ggp].move, s.dt[gp].move, s.dt[s.par].move, move]
+        moveSeq2 = moveSeq[1:]
+        moveSeq3 = moveSeq[2:]
+
+        s.isNotACycle = True
+        if moveSeq in s.cyclicalMoves or  moveSeq2 in s.cyclicalMoves or moveSeq3 in s.cyclicalMoves:
+            s.isNotACycle = False
+
+    def pickMoves(s):
+
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
-            # print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: fa"
             s.addToTree(s.dt, s.dt[s.par], "fa")
+            s.blah += 1
+            return
         else:
             for move in s.quadMoves:
-                # print "i: ", s.i, "  parent: ", s.par, " children: ", s.dt[s.par].children, "  move: ", move
+                playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
+                s.checkCycles(move)
                 if not s.obstacleFlag:
-                    s.prioritizeMoves(move,["w","nw","fw"])
-                elif move == "dr":
-                    playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
-                    if s.dt[s.par].move != "pu" and s.dt[s.par].player.isHoldingBlock:
-                        if playerAdj in s.blockGoals and s.dt[s.par].level.layout[playerAdj] == EMPY:
+                    if s.modifier < 0:
+                        s.prioritizeMoves(move,["w","nw","fw"])
+                    else:
+                        s.prioritizeMoves(move,["e","ne","fe"])
+                elif s.isNotACycle:
+                    if move == "dr":
+                        if s.dt[s.par].player.isHoldingBlock:
+                            if playerAdj in s.blockGoals and s.dt[s.par].level.layout[playerAdj] == EMPY:
+                                s.addToTree(s.dt, s.dt[s.par], move)
+                            # s.checkObstacles(s.i)
+                    elif move == "pu":
+                        if not s.dt[s.par].player.isHoldingBlock:
                             s.addToTree(s.dt, s.dt[s.par], move)
-                        # s.checkObstacles(s.i)
-                elif move == "pu":
-                    playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
-                    if s.dt[s.par].move != "dr" and not s.dt[s.par].player.isHoldingBlock:
-                        s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "w":
-                    if s.dt[ggp].move == "fe" and s.dt[gp].move == "e" and s.dt[s.par].move == "fw":
-                        x = 1
                     else:
                         s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "nw":
-                    # if s.dt[s.par].player.dir == WEST:
-                    s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "e":
-                    if s.dt[ggp].move == "fw" and s.dt[gp].move == "e" and s.dt[s.par].move == "fe":
-                        x = 1
-                    else:
-                        s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "ne":
-                    # if s.dt[s.par].player.dir == EAST:
-                    s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "fe":
-                    if s.dt[s.par].move != "fw": # and s.dt[s.par].player.dir == WEST:
-                        s.addToTree(s.dt, s.dt[s.par], move)
-                elif move == "fw":
-                    if s.dt[s.par].move != "fe": # and s.dt[s.par].player.dir == EAST:
-                        s.addToTree(s.dt, s.dt[s.par], move)
-                else:
-                    s.addToTree(s.dt, s.dt[s.par], move)
-        s.blah += 1
+            s.blah += 1
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -481,8 +482,6 @@ class Solver:
                 else:
                     break
                 s.quadMoves = []
-
-                # s.getParentIndex()
             bottom = s.blah
 
         endTime = time.clock()
@@ -495,12 +494,6 @@ class Solver:
     def stepThroughSolution(s):
         print(s.moveList)
         currentMove = s.moveList.pop(0)
-        if currentMove == "dr":
-            playerAdj = s.dt[0].player.index - 1 if s.dt[0].player.dir == WEST else s.dt[0].player.index + 1
-            s.dt[0].level.layout[playerAdj] = BLCK
-        if currentMove == "pu":
-            playerAdj = s.dt[0].player.index - 1 if s.dt[0].player.dir == WEST else s.dt[0].player.index + 1
-            s.dt[0].level.layout[playerAdj] = EMPY
         s.performMove(s.dt[0].level, s,s.dt[0].player, currentMove)
 
 #####################################################################
@@ -511,11 +504,11 @@ if __name__=='__main__':
     app = App(root)
     path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = [
-    # "level1.csv", 
-    # "level2.csv",
-    # "level3.csv",
-    # "level4.csv",
-    # "level5.csv",
+    "level1.csv", 
+    "level2.csv",
+    "level3.csv",
+    "level4.csv",
+    "level5.csv",
     "level6.csv"]
         # "level7.csv","level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
