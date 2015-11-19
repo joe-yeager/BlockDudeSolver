@@ -171,22 +171,29 @@ class Solver:
         }
         s.cyclicalMoves = [
             ["w", "fa", "fe", "ne"],
+            ['pu', 'e', 'fw', 'dr'],
+            ['pu', 'w', 'fe', 'dr'],
             ["e", "fa", "fw", "nw"],
             ["fw", "w", "fe", "e"],
             ["fe", "e", "fw", "w"],
             ["w", "w", "fe", "e"],
             ["e", "e", "fw", "w"],
+            ["w", "w", "w", "fe"],
+            ["e", "e", "e", "fw"],
             ["w", "fe", "e"],
             ["e", "fw", "w"],
             ["ne", "fw", "w"],
             ["nw", "fe", "e"],
+            ["w", "w", "fe"],
+            ["e", "e", "fw"],
             ["fw", "fe"],
             ["fe", "fw"],
             ["dr", "pu"],
             ["pu", "dr"]
         ]
 
-        s.obstacleFlag,s.trapFlag = False, False
+        s.spacesBelow = []
+        s.obstacleFlag, s.trapFlag = False, False
         s.obstacleHeights = []
         s.blocksRequired = []
         s.availableBlocks = 0
@@ -239,9 +246,12 @@ class Solver:
                     for j in range (1, i+1):
                         reset += s.modifier
                         tempI -= s.modifier
-                        if s.level.layout[tempI] != BRCK:
-                            s.blockGoals.append(tempI)
-                            s.blocksRequired += 1
+                        try:
+                            if s.level.layout[tempI] != BRCK:
+                                s.blockGoals.append(tempI)
+                                s.blocksRequired += 1
+                        except IndexError:
+                            break
                     tempI += s.level.width + reset
 
     def findBlocks(s, level):
@@ -301,7 +311,7 @@ class Solver:
             elif spaceAbove == DOOR:
                 return
 
-    def checkObstacles(s, index):
+    def checkObstaclesSolvable(s, index):
         s.obstacleIndices = []
         s.taxiCabDistance(s.dt[index].player)
         s.obstacleFlag = False
@@ -312,6 +322,13 @@ class Solver:
             if s.availableBlocks < s.blocksRequired:
                 print "Level is unsolvable, not enough blocks"
                 s.victory = True
+
+    def checkObstacles(s, index):
+        s.obstacleIndices = []
+        s.taxiCabDistance(s.dt[index].player)
+        s.obstacleFlag = False
+        s.checkObstaclesHelper(0,0,0, s.dt[index].player.index + s.modifier, s.dt[index].level)
+
 
     def checkVictory(s, move, moveList):
         for k,v in s.V.iteritems():
@@ -348,6 +365,12 @@ class Solver:
             index -= level.width
             return index
         return s.checkDown(index + level.width, level)
+
+    def getSpaceBelow(s, index, level):
+        if level.layout[index] != EMPY:
+            s.spacesBelow.push(index)
+            return 
+        return s.getSpaceBelow(index + level.width, level)
 
     def performMove(s,level,data, player, move):
         oldIndex = player.index
@@ -424,20 +447,24 @@ class Solver:
 
         try:
             moveSeq = [s.dt[ggp].move, s.dt[gp].move, s.dt[s.par].move, move]
-            moveSeq2 = moveSeq[1:]
-            moveSeq3 = moveSeq[2:]
+            for i in range(0, 3):
+                if moveSeq[i:] in s.cyclicalMoves:
+                    print "pruning"
+                    s.isNotACycle = False
+                    break
 
-            if moveSeq in s.cyclicalMoves or  moveSeq2 in s.cyclicalMoves or moveSeq3 in s.cyclicalMoves:
-                s.isNotACycle = False
         except KeyError:
             return
+
     def pickMoves(s):
 
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
             s.addToTree(s.dt, s.dt[s.par], "fa")
-            s.blah += 1
+            s.counter += 1
             return
         else:
+            if s.obstacleFlag:
+                s.checkObstacles(s.par)
             for move in s.quadMoves:
                 playerAdj = s.dt[s.par].player.index - 1 if s.dt[s.par].player.dir == WEST else s.dt[s.par].player.index + 1
                 s.checkCycles(move)
@@ -451,13 +478,36 @@ class Solver:
                         if s.dt[s.par].player.isHoldingBlock:
                             if playerAdj in s.blockGoals and s.dt[s.par].level.layout[playerAdj] == EMPY:
                                 s.addToTree(s.dt, s.dt[s.par], move)
-                            # s.checkObstacles(s.i)
                     elif move == "pu":
                         if not s.dt[s.par].player.isHoldingBlock:
-                            s.addToTree(s.dt, s.dt[s.par], move)
+                             if not s.checkCreatedObstacle(s.dt[s.par].player,s.dt[s.par].level):
+                                s.addToTree(s.dt, s.dt[s.par], move)
                     else:
                         s.addToTree(s.dt, s.dt[s.par], move)
-            s.blah += 1
+            s.counter += 1
+
+    def checkCreatedObstacle(s, player, level):
+        height = 0
+        xCoord = player.index % level.width
+
+        if player.dir == WEST:
+            if xCoord <= 2:
+                return False
+            indexToCheck = player.index - 2
+        else:
+            if xCoord >= level.width - 3:
+                return False
+            indexToCheck = player.index + 2
+        
+        while indexToCheck > 0:
+            if level.layout[indexToCheck] != EMPY:
+                height += 1
+                indexToCheck -= level.width
+            else:
+                break
+
+        return height > 1
+
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -466,26 +516,22 @@ class Solver:
             return
 
         s.i = 1
-        s.checkObstacles(0)
+        s.checkObstaclesSolvable(0)
         startTime = time.clock()
-        bottom = 0
-        s.blah = bottom
+        s.counter = 0
         while not s.victory:
-            lenDt = len(s.dt)
-            for i in range(bottom, lenDt):
-                s.par = s.dt.keys()[s.blah]
-                s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width,s.dt[s.par].level, s.dt[s.par].moveList)
-                for move in s.moveQuadrants:
-                    s.checkVictory(move, s.dt[s.par].moveList)
-                    if s.victory:
-                        break
-                    s.analyzeMoveQuads(move,s.par)
-                if not s.victory:
-                    s.pickMoves()
-                else:
+            s.par = s.dt.keys()[s.counter]
+            s.generateMoveQuads(s.dt[s.par].player.index, s.dt[s.par].level.layout, s.dt[0].level.width,s.dt[s.par].level, s.dt[s.par].moveList)
+            for move in s.moveQuadrants:
+                s.checkVictory(move, s.dt[s.par].moveList)
+                if s.victory:
                     break
-                s.quadMoves = []
-            bottom = s.blah
+                s.analyzeMoveQuads(move,s.par)
+            if not s.victory:
+                s.pickMoves()
+            else:
+                break
+            s.quadMoves = []
 
         endTime = time.clock()
         print "Time taken(secs): ", endTime - startTime
@@ -507,17 +553,17 @@ if __name__=='__main__':
     app = App(root)
     path, gamePath = "./testLevels/", "./gameLevels/"
     testFiles = [
-    "level1.csv", 
-    "level2.csv",
-    "level3.csv",
-    "level4.csv",
-    "level5.csv",
+    # "level1.csv", 
+    # "level2.csv",
+    # "level3.csv",
+    # "level4.csv",
+    # "level5.csv",
     "level6.csv",
     "level7.csv"]
         # "level8.csv"]
     gameFiles = ["level1.csv","level2.csv"]
-    app.loadLevels(path, testFiles)
-    # app.loadLevels(gamePath, gameFiles)
+    # app.loadLevels(path, testFiles)
+    app.loadLevels(gamePath, gameFiles)
 
     def startFunction():
         for i in range(0, len(app.levels)):
@@ -532,7 +578,7 @@ if __name__=='__main__':
                 root.update()
                 solver.stepThroughSolution()
                 app.displayLevel(solver.currentLevel)
-                time.sleep(0.2)
+                time.sleep(0.1)
             if i != len(app.levels) -1:
                 raw_input("Press Enter to begin solving next level")
             else:
