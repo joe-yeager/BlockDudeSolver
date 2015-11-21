@@ -211,7 +211,7 @@ class Solver:
         s.taxiCab = Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
-    def calculateBlocksRequired(s):
+    def findBlockGoals(s):
         s.blockGoals = []
         lenIndices, lenHeights = len(s.obstacleIndices), len(s.obstacleHeights)
         for k in range(0, lenIndices ):
@@ -263,7 +263,7 @@ class Solver:
         s.obstacleFlag = False
         s.checkObstaclesHelper(0,0,0, s.dt[index].player.index + s.modifier, s.dt[index].level, s.modifier)
         if s.obstacleFlag:
-            s.calculateBlocksRequired()
+            s.findBlockGoals()
 
 
     def checkObstacles(s, index):
@@ -284,10 +284,14 @@ class Solver:
     def generateMoveQuads(s, i, l, w, level, moveList):
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         s.moveQuadrants = []
-        s.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
-        s.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
-        s.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
-        s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
+        for i in range(0,5):
+            if i != 2:
+                s.moveQuadrants.append([ pg[i], pg[i+1], pg[i+3], pg[i+4] ])
+
+        # s.moveQuadrants.append([ pg[0], pg[1], pg[3], pg[4] ])
+        # s.moveQuadrants.append([ pg[1], pg[2], pg[4], pg[5] ])
+        # s.moveQuadrants.append([ pg[3], pg[4], pg[6], pg[7] ])
+        # s.moveQuadrants.append([ pg[4], pg[5], pg[7], pg[8] ])
 
     def addMove(s, move):
         if move not in s.quadMoves:
@@ -410,7 +414,6 @@ class Solver:
         else:
             if s.obstacleFlag:
                 s.checkObstacles(s.par)
-            s.generateAdjacent(cur.level)
             for move in s.quadMoves:
                 s.checkCycles(move)
                 if not s.obstacleFlag:
@@ -420,6 +423,7 @@ class Solver:
                         s.prioritizeMoves(move,["e","ne","fe"])
                 elif s.isNotACycle:
                     if move == "dr":
+                        s.generateAdjacent(cur.level)
                         inBlockGoals = any(i in s.playerAdj for i in s.blockGoals)
                         if inBlockGoals and cur.level.layout[cur.player.getAdj()] == EMPY:
                             s.addToTree(s.dt, cur, move)
@@ -481,9 +485,8 @@ class Solver:
                 s.pickMoves()
                 s.quadMoves = []
                 bottom = s.counter
-        print "Nodes: ", len(s.dt)
         endTime = time.clock()
-        print "Time taken(secs): ", endTime - startTime
+        print "\nTime taken(secs): ", endTime - startTime
         print "Solved!!!"
 
     def stepThroughSolution(s):
@@ -496,12 +499,22 @@ class Solver:
 if __name__=='__main__':
     root = Tk()
     app = App(root)
-    path, gamePath = "./testLevels/", "./gameLevels/"
+    setPause = False
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
     gameFiles = ["level1.csv","level2.csv"]
-    app.loadLevels(path, testFiles)
-    app.loadLevels(gamePath, gameFiles)
 
+
+    if len(sys.argv) >= 2:
+        if "test" in sys.argv:
+            print "Loading test sets..."
+            app.loadLevels("./testLevels/", testFiles)
+        if "game" in sys.argv:
+            print "Loading game levels..."
+            app.loadLevels("./gameLevels/", gameFiles)
+        if "pause" in sys.argv:
+            setPause = True
+    else:
+        print "Please provide an arugment:\n\ttest: runs the test sets\n\tgame: runs the levels"
     def startFunction():
         for i in range(0, len(app.levels)):
             solver = Solver()
@@ -509,16 +522,18 @@ if __name__=='__main__':
             app.displayLevel(solver.level)
             solver.solve()
             
-            raw_input("Press Enter to view solution...")
+            if setPause:
+                raw_input("Press Enter to view solution...")
             while(len(solver.moveList) > 0):
                 root.update()
                 solver.stepThroughSolution()
                 app.displayLevel(solver.currentLevel)
-                time.sleep(0.1)
-            if i != len(app.levels) -1:
-                raw_input("Press Enter to begin solving next level")
-            else:
-                raw_input("Done!  Press enter to exit.")
+                time.sleep(0.15)
+            if setPause:
+                if i != len(app.levels) -1:
+                    raw_input("Press Enter to begin solving next level")
+                else:
+                    raw_input("Done!  Press enter to exit.")
 
         sys.exit(0)
 
