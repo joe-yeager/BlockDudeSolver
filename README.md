@@ -10,18 +10,18 @@ An automated solver for Block Dude using heuristic search and constraint satisfa
 ###Run the program:
   <b>Test sets:<b>
   
-    `python solver.py test`
+    python solver.py test
     
   <b>Game:</b>
   
-    `python solver.py game`
+    python solver.py game
     
   <b>Both:</b>
   
-    `python solver.py test game`
+    python solver.py test game
     
   <b>Both with pauses in between levels:</b>
   
-    `python solver.py test game pause`
+    python solver.py test game pause
 
 The program requires python 2.7 due to dependencies, so if any of the above commands fail try replacing python with python2.7
