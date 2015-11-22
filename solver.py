@@ -29,11 +29,11 @@ class Node:
         s.move = None
         s.level = Level(0,0,0)
         s.player = Player()
-        s.moveList, s.children, s.blockLocs, s.blockGoals = [],[],[],[]
+        s.moveList, s.children, s.blockGoals = [],[],[]
 
-#####################################################################
-######################        App Class        ######################
-#####################################################################
+#  The app class is resonsible for loading and parsing the CSV files that
+#  contain the levels.  It is also responsible for displaying the GUI and
+#  updating it when a change has been made.
 class App:
     def __init__(s, root):
         s.root = root
@@ -82,9 +82,10 @@ class App:
     def run(s):
         s.root.mainloop()
 
-#####################################################################
-######################      Player Class       ######################
-#####################################################################
+
+# The player class is responsible for saving the state of a player, this 
+# includes: the players position or index, the direction the player is facing,
+# if the player is falling, etc. This class is also responsible for performing a players moves.
 class Player:
     def __init__(s):
         s.pos = Coordinate(0,0)
@@ -138,9 +139,8 @@ class Player:
         else:
             return s.index + 1
 
-#####################################################################
-####################        Solver Class        #####################
-#####################################################################
+# The solver class contains all of the logic that is needed to solve
+# the first two levels of Block Dude as well as all the test sets.
 class Solver:
     def __init__(s):
         
@@ -152,8 +152,11 @@ class Solver:
         s.root.children = s.getChildren(0)
 
         s.obstacleFlag, s.victory = False, False
-        s.spacesBelow, s.blockGoals, s.blockLocs, s.moveQuadrants, s.moveList,s.quadMoves = [],[],[],[],[],[]
+        s.spacesBelow, s.blockGoals, s.moveQuadrants, s.moveList, s.quadMoves = [],[],[],[],[]
         s.obstacles = {}
+
+        # validMoves contains all of the legal moves that can be made
+        # Thhe moves are expressed as 2x2 matrices that have been linearized
         s.validMoves = {
             "e":  [[0,0,4,0]],
             "w":  [[0,0,0,3]],
@@ -167,6 +170,7 @@ class Solver:
                             [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
         }
 
+        # Victory moves contains all of the legal moves that result in victory.
         s.victoryMoves = {
             "e":    [[0,0,4,5]],
             "w":    [[0,0,5,3]],
@@ -176,6 +180,7 @@ class Solver:
                         [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]]
         }
 
+        # List of moves that result in cycles or backwards progress
         s.cyclicalMoves = [
             ["w", "fa", "fe", "ne"], ["e", "fa", "fw", "nw"],
             ["fw", "w", "fe", "e"],  ["fe", "e", "fw", "w"],
@@ -192,6 +197,7 @@ class Solver:
             ["w", "fe"],  ["e", "fw"]
         ]
 
+    # Takes a level as an argument and sets it as the current working level in the solver
     def setLevel(s,level):
         s.root.level = Level(level.width,level.height,list(level.layout) )
         s.level = Level(level.width,level.height,list(level.layout) )
@@ -199,6 +205,8 @@ class Solver:
         s.length = len(s.level.layout)
         s.root.player = Player()
 
+    # Locates the player and the door in the level
+    # Sets the x,y coords of the player and the goal
     def locateStartAndGoalState(s):
         s.goalPos = Coordinate(-1,-1)
         s.root.player.setPos(-1,-1)
@@ -212,17 +220,19 @@ class Solver:
                 s.root.player.setIndex(i)
                 s.root.player.setDirection(s.level.layout[i])
 
+    # Computes the taxi cab distance between the player and the door
+    # Sets s.modifier to -1 if the value is negative and 1 otherwise
+    # The modifer is used quite often in other computations
     def taxiCabDistance(s, player):
         s.taxiCab = Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
-    def makeStairs(s):
-        pass
-
+    # Uses the list of obstacles computed by checkObstacles to determine
+    # where blocks need to be placed to complete an obstacle.  It will check
+    # to both the east and the west of the obstacle
     def findBlockGoals(s):
         s.blockGoals = []
         numOfObs = len(s.obstacles)
-        print s.obstacles
         nonEmpty = [BRCK, BLCK]
         for index,height in s.obstacles.iteritems():
             reset = 0
@@ -235,20 +245,17 @@ class Solver:
                     reset += s.modifier
                     tempIR -= s.modifier
                     tempIL += s.modifier
-
+                    # Check to the east and the west,  if the block adjacent in either direction is nonEmpty
+                    # don't add  blocks in that direction of the obstacle to the blockGoals list
                     if s.level.layout[east] not in nonEmpty and s.level.layout[tempIR] not in nonEmpty:
-                        print "obstacle:", index, "blockLoc:", tempIR
                         s.blockGoals.append(tempIR)
                     if s.level.layout[west] not in nonEmpty and s.level.layout[tempIL] not in nonEmpty:
-                        print "obstacle:", index, "blockLoc:", tempIL
                         s.blockGoals.append(tempIL)
                 tempIR += s.level.width + reset
                 tempIL += s.level.width - reset
 
-
-        print s.root.player.index
-        print set(s.blockGoals)
-
+    # Checks for obstacles only between the player and the goal
+    # If obstacles are found, call findBlockGoals
     def checkObstaclesFindBlocks(s, index):
         cur = s.dt[index]
         s.taxiCabDistance(s.dt[index].player)
@@ -257,6 +264,8 @@ class Solver:
         if s.obstacleFlag:
             s.findBlockGoals()
 
+    # checkFor obstacles in both directions.  This will clear the obstacle flag
+    # if nothing is found.
     def checkObstacles(s, index):
         cur = s.dt[index]
         s.obstacles = {}
@@ -265,6 +274,11 @@ class Solver:
         s.checkObstaclesHelper(0,0,0, cur.player.index + mod, cur.level, mod)
         s.checkObstaclesHelper(0,0,0, cur.player.index - mod, cur.level, -mod)
 
+    # Recursive helper function for finding obstacles.  It will scan along the ground and descend into pits
+    # until an obstacle is found.  When an obstacle is found it will check its height, if its height is more that
+    # 1 higher than obstacle adjacent to it, it will set the obstacle flag, and store the index of the highest point
+    # of the obstacle as well as it's height.  If a pit of depth 2 or greater is found, it will store the index of 
+    # the dropoff point.
     def checkObstaclesHelper(s, prevHeight, height, depth, index, level, modifier):
         spaceAbove = level.layout[index - level.width]
         if (height + 1) - prevHeight > 1 and (spaceAbove == EMPY or spaceAbove == DOOR):
@@ -302,6 +316,8 @@ class Solver:
             elif spaceAbove == DOOR:
                 return
 
+    # Check if any of the current moves are a victory move.  If one of them is,
+    # add it to the move list and set the victory flag.
     def checkVictory(s, move, moveList):
         for k,v in s.victoryMoves.iteritems():
             if move in v:
@@ -310,6 +326,8 @@ class Solver:
                 s.victory = True
                 break
 
+    # Takes a linear version of the 3x3 matrix surrounding the player and chops it
+    # up into quadrants that can be scanned for moves.
     def generateMoveQuads(s, i, l, w, level, moveList):
         pg = [ l[i-w-1], l[i-w], l[i-w+1], l[i-1], l[i], l[i+1], l[i+w-1], l[i+w],l[i+w+1] ]
         s.moveQuadrants = []
@@ -317,10 +335,8 @@ class Solver:
             if i != 2:
                 s.moveQuadrants.append([ pg[i], pg[i+1], pg[i+3], pg[i+4] ])
 
-    def addMove(s, move):
-        if move not in s.quadMoves:
-            s.quadMoves.append(move)
-
+    # analyze the move quadrants generated, and check them for legal moves.
+    # Add legal moves into list
     def analyzeMoveQuads(s, move, index):
         cur = s.dt[index]
         for k,v in s.validMoves.iteritems():
@@ -332,18 +348,19 @@ class Solver:
                 elif k != "dr" and k != "pu":
                     s.addMove(k)
 
+    # Add a move to the currently available moves list
+    def addMove(s, move):
+        if move not in s.quadMoves:
+            s.quadMoves.append(move)
+
+    # Recusively scans down until a non empty space is found
     def checkDown(s,index, level):
         if level.layout[index] != EMPY:
             index -= level.width
             return index
         return s.checkDown(index + level.width, level)
 
-    def getSpaceBelow(s, index, level):
-        if level.layout[index] != EMPY:
-            s.spacesBelow.push(index)
-            return 
-        return s.getSpaceBelow(index + level.width, level)
-
+    # Have the player perform the move, and update the level
     def performMove(s,level,data, player, move):
         oldIndex = player.index
 
@@ -372,42 +389,49 @@ class Solver:
         level.layout[oldIndex] = 0
         level.layout[player.index] = player.dir
 
+    # Get the parent index of the current working index.
+    # Uses the same indexing scheme as n-ary array representation of trees
     def getParentIndex(s):
         s.par =  int ( math.floor( (s.i - 1) / 3 ) )
         if s.par < 0:
             s.par = 0
 
-    def getGrandParentIndex(s, index):
-        newGP =  int ( math.floor( (index - 1) / 3 ) )
-        if newGP < 0:
-            newGP = 0
-        return newGP
-
+    # Takes an index and uses it to generate the index of the nth child
+    # Uses the same indexing scheme as n-ary array representation of trees
     def getNthChild(s,index, nth):
         return 3 * index + 1 + nth
 
+    # Returns a list of the children indices of index
     def getChildren(s,index):
         return [ s.getNthChild(index,0), s.getNthChild(index, 1), s.getNthChild(index, 2)]
 
+    # Pops a child index of the parents list of children
+    # Creates a new node and deep copies the parents data
+    # Generates the list of children for the new node
+    # Takes the move that caused the branch and adds it to the new
+    # nodes move list, then performs using the new nodes player and level
+    # adds the node to the tree
     def addToTree(s, tree, parent, move):
         s.i = s.dt[s.par].children.pop(0)
         newChild = Node()
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)
-        # print "moveList: ", newChild.moveList
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
         newChild.children = s.getChildren(s.i)
-        newChild.blockLocs = list(s.blockLocs)
         newChild.blockGoals = list(s.blockGoals)
         s.performMove(newChild.level, newChild, newChild.player, move)
         tree[s.i] = newChild
 
+    # Syntactic sugar used for prioritizing moves
     def prioritizeMoves(s, move, moves):
         if move in moves:
             s.addToTree(s.dt, s.dt[s.par], move)
 
+    # Checks the move list in combination with the new 
+    # potential move to see if it would generate a cyclical
+    # move and sets a flag if it does.
     def checkCycles(s, move, moveList):
         l = 3
         s.isNotACycle = True
@@ -418,6 +442,10 @@ class Solver:
                 s.isNotACycle = False
                 break
 
+    # Generates the spaces that are adjacent to the player 
+    # given the current direction they are facing.  If there
+    # is a dropoff in front of the player, it decends the dropoff
+    # and adds all of those spaces aswell.
     def generateAdjacent(s, level):
         s.playerAdj = []
         tempI = s.dt[s.par].player.getAdj()
@@ -428,6 +456,10 @@ class Solver:
                 s.playerAdj.append(tempI)
             tempI += level.width
 
+    # Checks if falling is a available move at the time, and 
+    # if it is, falling is chosen due to the physics of the game.
+    # Other wise it checks to see if there are still obstacles
+    # and then loops through the list of available moves and 
     def pickMoves(s):
         cur = s.dt[s.par]
         if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
@@ -435,49 +467,24 @@ class Solver:
             s.counter += 1
             return
 
-        if s.obstacleFlag:
+        if s.obstacleFlag: # If check to see if obstacles have been cleared
             s.checkObstacles(s.par)
         for move in s.quadMoves:
             s.checkCycles(move, s.dt[s.par].moveList)
-            if not s.obstacleFlag:
+            if not s.obstacleFlag:  # If there are no obstacles, run for the goal
                 if s.modifier < 0:
                     s.prioritizeMoves(move,["w","nw","fw"])
                 else:
                     s.prioritizeMoves(move,["e","ne","fe"])
-            elif s.isNotACycle:
+            elif s.isNotACycle:  # Only pick moves that will not generate cycles
                 if move == "dr":
                     s.generateAdjacent(cur.level)
-                    inBlockGoals = any(i in s.playerAdj for i in s.blockGoals)
-                    if inBlockGoals and cur.level.layout[cur.player.getAdj()] == EMPY:
+                    #  Only drop a block if it is in one of the block goals.
+                    if any(i in s.playerAdj for i in s.blockGoals):
                         s.addToTree(s.dt, cur, move)
-                elif move == "pu":
-                    s.addToTree(s.dt, cur, move)
                 else:
                     s.addToTree(s.dt, cur, move)
         s.counter += 1
-
-    def checkCreatedObstacle(s, player, level):
-        height = 0
-        xCoord = player.index % level.width
-
-        if player.dir == WEST:
-            if xCoord <= 2:
-                return False
-            indexToCheck = player.index - 2
-        else:
-            if xCoord >= level.width - 3:
-                return False
-            indexToCheck = player.index + 2
-        
-        while indexToCheck > 0:
-            if level.layout[indexToCheck] != EMPY:
-                height += 1
-                indexToCheck -= level.width
-            else:
-                break
-
-        return height > 1
-
 
     def solve(s):
         s.locateStartAndGoalState()
@@ -489,7 +496,7 @@ class Solver:
         while not s.victory:
             lenDt = len(s.dt)
             if bottom == lenDt:
-                print "\nOver pruned :("
+                print "\nFailed to Solve"
                 return
             for i in range(bottom, lenDt):
                 s.par = s.dt.keys()[s.counter]
@@ -505,12 +512,13 @@ class Solver:
                 bottom = s.counter
         
         print "\nTime taken(secs): ", time.clock() - startTime
-        print "Solved!!!"
+        moveListWorstCase = (3**len(s.moveList))
+        treeReduction = (moveListWorstCase - len(s.dt))
+        print "Solved!!! Uses", len(s.moveList), "moves and a tree with", len(s.dt), "nodes, a reduction of %.5g nodes" %treeReduction
 
     def stepThroughSolution(s):
         currentMove = s.moveList.pop(0)
         s.performMove(s.root.level, s,s.root.player, currentMove)
-
 
 #####################################################################
 ####################         Program Loop        ####################
@@ -521,8 +529,6 @@ if __name__=='__main__':
     setPause = False
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
     gameFiles = ["level1.csv","level2.csv"]
-    #,"level3.csv"]
-
 
     if len(sys.argv) >= 2:
         if "test" in sys.argv:
@@ -541,7 +547,7 @@ if __name__=='__main__':
         for i in range(0, len(app.levels)):
             solver = Solver()
             solver.setLevel(app.levels[i])
-            app.displayLevel(solver.level)
+            app.displayLevel(app.levels[i])
             root.update()
             solver.solve()
             
