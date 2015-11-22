@@ -152,8 +152,8 @@ class Solver:
         s.root.children = s.getChildren(0)
 
         s.obstacleFlag, s.victory = False, False
-        s.spacesBelow, s.obstacleHeights, s.blockGoals, s.blockLocs, s.moveQuadrants, s.moveList,s.quadMoves = [],[],[],[],[],[],[]
-
+        s.spacesBelow, s.blockGoals, s.blockLocs, s.moveQuadrants, s.moveList,s.quadMoves = [],[],[],[],[],[]
+        s.obstacles = {}
         s.validMoves = {
             "e":  [[0,0,4,0]],
             "w":  [[0,0,0,3]],
@@ -212,24 +212,41 @@ class Solver:
         s.taxiCab = Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
+    def makeStairs(s):
+        pass
+
     def findBlockGoals(s):
         s.blockGoals = []
-        lenIndices, lenHeights = len(s.obstacleIndices), len(s.obstacleHeights)
-        for k in range(0, lenIndices ):
-            tempI = s.obstacleIndices[k] + (s.level.width)
+        numOfObs = len(s.obstacles)
+        print s.obstacles
+        nonEmpty = [BRCK, BLCK]
+        for index,height in s.obstacles.iteritems():
             reset = 0
-            for l in range(0, lenHeights ):
-                for i in range (1, s.obstacleHeights[l]):
-                    for j in range (1, i+1):
-                        reset += s.modifier
-                        tempI -= s.modifier
-                        if s.level.layout[tempI] != BRCK:
-                            s.blockGoals.append(tempI)
-                    tempI += s.level.width + reset
+            west = index - 1
+            east = index + 1
+            tempIR = index + (s.level.width)
+            tempIL = tempIR
+            for i in range (1, height):
+                for j in range (1, i+1):
+                    reset += s.modifier
+                    tempIR -= s.modifier
+                    tempIL += s.modifier
+
+                    if s.level.layout[east] not in nonEmpty and s.level.layout[tempIR] not in nonEmpty:
+                        print "obstacle:", index, "blockLoc:", tempIR
+                        s.blockGoals.append(tempIR)
+                    if s.level.layout[west] not in nonEmpty and s.level.layout[tempIL] not in nonEmpty:
+                        print "obstacle:", index, "blockLoc:", tempIL
+                        s.blockGoals.append(tempIL)
+                tempIR += s.level.width + reset
+                tempIL += s.level.width - reset
+
+
+        print s.root.player.index
+        print set(s.blockGoals)
 
     def checkObstaclesFindBlocks(s, index):
         cur = s.dt[index]
-        s.obstacleIndices = []
         s.taxiCabDistance(s.dt[index].player)
         s.obstacleFlag = False
         s.checkObstaclesHelper(0,0,0, cur.player.index + s.modifier, cur.level, s.modifier)
@@ -238,7 +255,7 @@ class Solver:
 
     def checkObstacles(s, index):
         cur = s.dt[index]
-        s.obstacleIndices = []
+        s.obstacles = {}
         s.obstacleFlag = False
         mod = 1
         s.checkObstaclesHelper(0,0,0, cur.player.index + mod, cur.level, mod)
@@ -246,10 +263,15 @@ class Solver:
 
     def checkObstaclesHelper(s, prevHeight, height, depth, index, level, modifier):
         spaceAbove = level.layout[index - level.width]
-        if (height + 1) - prevHeight > 1 and spaceAbove == EMPY:
+        print height + 1
+        if (height + 1) - prevHeight > 1 and (spaceAbove == EMPY or spaceAbove == DOOR):
             s.obstacleFlag = True
-            s.obstacleHeights.append(height + 1)
-            s.obstacleIndices.append(index)
+            s.obstacles[index] = height + 1
+        if depth >= 2:
+            s.obstacleFlag = True
+            newIndex = index - ((depth -1) * level.width) - modifier
+            if newIndex not in s.obstacles:
+                s.obstacles[newIndex] = depth
         if index % level.width ==  0 or index < 0 or index > s.length or level.layout[index] == DOOR:
             return
 
@@ -258,20 +280,22 @@ class Solver:
             if spaceBelow == BLCK or spaceBelow == BRCK: # If space below is brick/block go forward
                 newIndex = index + modifier
                 s.checkObstaclesHelper(0, 0, 0, newIndex, level, modifier)
-            elif spaceBelow == EMPY: # If space below is brick/block go down
+            elif spaceBelow == EMPY: # If space below is empty go down
                 newIndex = index  +  s.level.width
-                s.checkObstaclesHelper(0, 0, depth+1, newIndex, level, modifier)
+                s.checkObstaclesHelper(prevHeight, height, depth+1, newIndex, level, modifier)
             elif spaceBelow == DOOR:
                 return
 
         else:
             spaceAbove = level.layout[index - level.width]
-            if spaceAbove == BLCK or spaceAbove == BRCK: # move up when the block above is a block
+            if spaceAbove == BRCK: # move up when the block above is a block
                 newIndex = index -  level.width
                 s.checkObstaclesHelper(prevHeight, height+1, 0, newIndex, level, modifier)
-            elif spaceAbove == EMPY: # move forward when the block above is empty 
+            elif spaceAbove == BLCK  or spaceAbove == EMPY: # move forward when the block above is empty 
                 newIndex = index  +  modifier
-                s.checkObstaclesHelper(height+1, 0, 0, newIndex, level, modifier)
+                if level.layout[newIndex] == EMPY:
+                    depth += 1
+                s.checkObstaclesHelper(0, 0, depth, newIndex, level, modifier)
             elif spaceAbove == DOOR:
                 return
 
@@ -368,7 +392,7 @@ class Solver:
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)
-        # print "moveList: ", newChild.moveList
+        print "moveList: ", newChild.moveList
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
         newChild.children = s.getChildren(s.i)
@@ -381,11 +405,10 @@ class Solver:
         if move in moves:
             s.addToTree(s.dt, s.dt[s.par], move)
 
-    def checkCycles(s, move):
+    def checkCycles(s, move, moveList):
         s.isNotACycle = True
-        gp =  s.getGrandParentIndex(s.par)
-        ggp = s.getGrandParentIndex(gp)
-        moveSeq = [s.dt[ggp].move, s.dt[gp].move, s.dt[s.par].move, move]
+        moveSeq = moveList[-3:]
+        moveSeq.append(move)
         for i in range(0, 3):
             if moveSeq[i:] in s.cyclicalMoves:
                 s.isNotACycle = False
@@ -408,10 +431,10 @@ class Solver:
             s.counter += 1
             return
 
-        if s.obstacleFlag:
-            s.checkObstacles(s.par)
+        # if s.obstacleFlag:
+        #     s.checkObstacles(s.par)
         for move in s.quadMoves:
-            s.checkCycles(move)
+            s.checkCycles(move, s.dt[s.par].moveList)
             if not s.obstacleFlag:
                 if s.modifier < 0:
                     s.prioritizeMoves(move,["w","nw","fw"])
@@ -424,8 +447,8 @@ class Solver:
                     if inBlockGoals and cur.level.layout[cur.player.getAdj()] == EMPY:
                         s.addToTree(s.dt, cur, move)
                 elif move == "pu":
-                     if not s.checkCreatedObstacle(cur.player,cur.level):
-                        s.addToTree(s.dt, cur, move)
+                     # if not s.checkCreatedObstacle(cur.player,cur.level):
+                    s.addToTree(s.dt, cur, move)
                 else:
                     s.addToTree(s.dt, cur, move)
         s.counter += 1
@@ -463,7 +486,7 @@ class Solver:
         while not s.victory:
             lenDt = len(s.dt)
             if bottom == lenDt:
-                print "\nOver pruned :("
+                # print "\nOver pruned :("
                 return
             for i in range(bottom, lenDt):
                 s.par = s.dt.keys()[s.counter]
