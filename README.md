@@ -8,7 +8,7 @@ An automated solver for Block Dude using heuristic search and constraint satisfa
 `sudo apt-get install python-imaging-tk`
 
 ###Run the program:
-  <b>Test sets:<b>
+  <b>Test sets:</b>
   
     python solver.py test
     
