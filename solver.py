@@ -178,14 +178,18 @@ class Solver:
 
         s.cyclicalMoves = [
             ["w", "fa", "fe", "ne"], ["e", "fa", "fw", "nw"],
-            ["fw", "w", "fe", "e"], ["fe", "e", "fw", "w"],
-            ["w", "w", "fe", "e"], ["e", "e", "fw", "w"],
-            ["w", "w", "w", "fe"], ["e", "e", "e", "fw"],
-            ["w", "fe", "e"], ["e", "fw", "w"],
+            ["fw", "w", "fe", "e"],  ["fe", "e", "fw", "w"],
+            ["w", "w", "w", "fe"],   ["e", "e", "e", "fw"],
+            ['pu', 'e', 'fw', 'dr'], ['pu', 'w', 'fe', 'dr'],
+            
+            ["w", "w", "fe"],  ["e", "e", "fw"],            
+            ["w", "fe", "e"],  ["e", "fw", "w"],
             ["ne", "fw", "w"], ["nw", "fe", "e"],
-            ["w", "w", "fe"], ["e", "e", "fw"],
+            ["w", "w", "fe"],  ["e", "e", "fw"],
+            
             ["fw", "fe"], ["fe", "fw"],
-            ["dr", "pu"], ["pu", "dr"]
+            ["dr", "pu"], ["pu", "dr"],
+            ["w", "fe"],  ["e", "fw"]
         ]
 
     def setLevel(s,level):
@@ -263,7 +267,6 @@ class Solver:
 
     def checkObstaclesHelper(s, prevHeight, height, depth, index, level, modifier):
         spaceAbove = level.layout[index - level.width]
-        print height + 1
         if (height + 1) - prevHeight > 1 and (spaceAbove == EMPY or spaceAbove == DOOR):
             s.obstacleFlag = True
             s.obstacles[index] = height + 1
@@ -392,7 +395,7 @@ class Solver:
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)
-        print "moveList: ", newChild.moveList
+        # print "moveList: ", newChild.moveList
         newChild.player.copy(parent.player)
         newChild.level.copy(parent.level)
         newChild.children = s.getChildren(s.i)
@@ -406,10 +409,11 @@ class Solver:
             s.addToTree(s.dt, s.dt[s.par], move)
 
     def checkCycles(s, move, moveList):
+        l = 3
         s.isNotACycle = True
-        moveSeq = moveList[-3:]
+        moveSeq = moveList[-l:]
         moveSeq.append(move)
-        for i in range(0, 3):
+        for i in range(0, l):
             if moveSeq[i:] in s.cyclicalMoves:
                 s.isNotACycle = False
                 break
@@ -431,8 +435,8 @@ class Solver:
             s.counter += 1
             return
 
-        # if s.obstacleFlag:
-        #     s.checkObstacles(s.par)
+        if s.obstacleFlag:
+            s.checkObstacles(s.par)
         for move in s.quadMoves:
             s.checkCycles(move, s.dt[s.par].moveList)
             if not s.obstacleFlag:
@@ -447,7 +451,6 @@ class Solver:
                     if inBlockGoals and cur.level.layout[cur.player.getAdj()] == EMPY:
                         s.addToTree(s.dt, cur, move)
                 elif move == "pu":
-                     # if not s.checkCreatedObstacle(cur.player,cur.level):
                     s.addToTree(s.dt, cur, move)
                 else:
                     s.addToTree(s.dt, cur, move)
@@ -486,7 +489,7 @@ class Solver:
         while not s.victory:
             lenDt = len(s.dt)
             if bottom == lenDt:
-                # print "\nOver pruned :("
+                print "\nOver pruned :("
                 return
             for i in range(bottom, lenDt):
                 s.par = s.dt.keys()[s.counter]
@@ -518,6 +521,7 @@ if __name__=='__main__':
     setPause = False
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
     gameFiles = ["level1.csv","level2.csv"]
+    #,"level3.csv"]
 
 
     if len(sys.argv) >= 2:
@@ -538,6 +542,7 @@ if __name__=='__main__':
             solver = Solver()
             solver.setLevel(app.levels[i])
             app.displayLevel(solver.level)
+            root.update()
             solver.solve()
             
             if setPause:
@@ -546,7 +551,7 @@ if __name__=='__main__':
                 root.update()
                 solver.stepThroughSolution()
                 app.displayLevel(solver.currentLevel)
-                time.sleep(0.15)
+                time.sleep(0.13)
             if setPause:
                 if i != len(app.levels) -1:
                     raw_input("Press Enter to begin solving next level")
