@@ -2,8 +2,8 @@ from src import data
 from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
 import csv
-EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
-width, height = 0,0
+from src import constants as c
+width, height = c.WIDTH, c.HEIGHT
 
 #  The app class is resonsible for loading and parsing the CSV files that
 #  contain the levels.  It is also responsible for displaying the GUI and
@@ -23,6 +23,11 @@ class App:
         for i in range(0,len(filenames)):
             s.imageArray.append(ImageTk.PhotoImage(file="./assets/" + filenames[i]))
 
+    def updateCanvasDems(s,width, height):
+        newWidth = (width*24)+100
+        newHeight = (height*24)+100
+        s.canvas.config(width=newWidth,height=newHeight)
+
     def displayLevel(s,level):
         s.canvas.delete("all")
         s.updateCanvasDems(level.width,level.height)
@@ -31,10 +36,9 @@ class App:
         for i in range(0,length):
             if i % (level.width) == 0:
                 row += 1
-            if level.layout[i] != EMPY:
-                x = ((i%(level.width))*24) + 65
-                y = (row*24) + 40
-                s.canvas.create_image(x,y, image=s.imageArray[level.layout[i]])
+            x = ((i%(level.width))*24) + 65
+            y = (row*24) + 40
+            s.canvas.create_image(x,y, image=s.imageArray[level.layout[i]])
 
     def loadLevels(s,path, fileArray):
         length = len(fileArray)
@@ -47,11 +51,6 @@ class App:
                 height = level.pop(0)
                 newLevel = data.Level(width,height,level)
                 s.levels.append(newLevel)
-
-    def updateCanvasDems(s,width, height):
-        newWidth = (width*24)+100
-        newHeight = (height*24)+100
-        s.canvas.config(width=newWidth,height=newHeight)
 
     def run(s):
         s.root.mainloop()

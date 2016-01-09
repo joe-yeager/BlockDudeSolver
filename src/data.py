@@ -1,12 +1,7 @@
-import sys
-from Tkinter import Tk, Frame, Canvas
-from PIL import ImageTk
-import csv
-import time
-import math
+from src import constants as c
 from collections import OrderedDict
-EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
-width, height = 0,0
+
+# EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 
 #####################################################################
 ######################        Data Types        #####################
@@ -17,19 +12,64 @@ class Coordinate:
 
 class Level:
     def __init__(s, width,height,layout):
-        s.width, s.height, s.layout = width, height, layout
+        s.width, s.height, s.layout = width, height, list(layout)
 
     def copy(s, level):
         s.width = level.width
         s.height = level.height
         s.layout = list(level.layout)
 
-class Node:
+class Tree:
     def __init__(s):
-        s.move = None
-        s.level = Level(0,0,0)
+        pass
+
+class Node:
+    def __init__(s, index, move, moveList, player, level, blockGoals):
+        s.index = index
+        
+        s.level = Level(0,0,[])
+        s.level.copy(level)
+        
         s.player = Player()
-        s.moveList, s.children, s.blockGoals = [],[],[]
+        s.player.copy(player)
+        
+        s.setMove(move)
+        s.setMoveList(moveList)
+        s.addToMoveList(move)
+
+        s.setBlockGoals(blockGoals)
+        
+        s.children = [ s.getNthChild(0), s.getNthChild(1), s.getNthChild(2)]
+
+    def getNthChild(s,nth):
+        return 3 * s.index + 1 + nth
+
+    def popChild(s):
+        return s.children.pop(0)
+
+    def setMove(s, move):
+        s.move = move
+
+    def getMove(s):
+        return s.move
+
+    def setMoveList(s, moveList):
+        s.moveList = list(moveList)
+
+    def getMoveList(s):
+        return list(s.moveList)
+
+    def addToMoveList(s, move):
+        s.moveList.append(move)
+
+    def setBlockGoals(s, blockGoals):
+        s.blockGoals = list(blockGoals)
+
+    def getBlockGoals(s, blockGoals):
+        return s.blockGoals
+
+    def setLevel(s, level):
+        s.level.copy(level)
 
 class Player:
     def __init__(s):
@@ -79,7 +119,7 @@ class Player:
         s.index = index
 
     def getAdj(s):
-        if s.dir == WEST:
+        if s.dir == c.WEST:
             return s.index - 1
         else:
             return s.index + 1

@@ -1,0 +1,8 @@
+EMPY = 0
+BRCK = 1 
+BLCK = 2 
+WEST = 3 
+EAST = 4
+DOOR = 5
+WIDTH = 0
+HEIGHT = 0

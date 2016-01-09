@@ -19,8 +19,7 @@ def check_args(_app):
 
 def startFunction():
     for i in range(0, len(_app.levels)):
-        _solver = solver.Solver("./data/data.json")
-        _solver.setLevel(_app.levels[i])
+        _solver = solver.Solver("./data/data.json", _app.levels[i])
         _app.displayLevel(_app.levels[i])
         root.update()
         _solver.solve()
@@ -29,7 +28,7 @@ def startFunction():
         while(len(_solver.moveList) > 0):
             root.update()
             _solver.stepThroughSolution()
-            _app.displayLevel(_solver.currentLevel)
+            _app.displayLevel(_solver.getLevel())
             time.sleep(0.13)
         if i != len(_app.levels) -1:
             raw_input("Press Enter to begin solving next level")

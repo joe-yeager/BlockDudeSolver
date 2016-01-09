@@ -3,55 +3,65 @@ import time
 import math
 from collections import OrderedDict
 import json
-EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
-width, height = 0,0
+from src import constants as c
+EMPY, BRCK, BLCK, WEST, EAST, DOOR = c.EMPY, c.BRCK, c.BLCK, c.WEST, c.EAST, c.DOOR
 
 # The solver class contains all of the logic that is needed to solve
 # the first two levels of Block Dude as well as all the test sets.
 class Solver:
-    def __init__(s, data_file):
+    def __init__(s, data_file, level):
+        l = level
         
         # Set up the search tree root node
         s.dt = OrderedDict()
-        s.dt[0] = data.Node()
+        s.dt[0] = data.Node(0,"",[], data.Player(), data.Level(l.width, l.height, l.layout), [])
         s.root = s.dt[0]
-        s.root.moveList = []
-        s.root.children = s.getChildren(0)
+
+        s.level = data.Level(level.width, level.height, level.layout )
+        s.length = len(s.level.layout)
 
         s.obstacleFlag, s.victory = False, False
-        s.spacesBelow, s.blockGoals, s.moveQuadrants, s.moveList, s.quadMoves = [],[],[],[],[]
+        s.spacesBelow, s.blockGoals, s.moveQuadrants, s.moveList, s.availableMoves = [],[],[],[],[]
         s.obstacles = {}
 
         # validMoves contains all of the legal moves that can be made
         # Thhe moves are expressed as 2x2 matrices that have been linearized
         with open(data_file) as data_json:
             moves = json.load(data_json)
+
         s.validMoves = moves.get("valid_moves", None)
         s.victoryMoves = moves.get("victory_moves", None)
         s.cyclicalMoves = moves.get("cyclical_moves", None)
 
-    # Takes a level as an argument and sets it as the current working level in the solver
-    def setLevel(s,level):
-        s.root.level = data.Level(level.width,level.height,list(level.layout) )
-        s.level = data.Level(level.width,level.height,list(level.layout) )
-        s.currentLevel = s.root.level
-        s.length = len(s.level.layout)
-        s.root.player = data.Player()
+    def getLevel(s):
+        return s.root.level
+
+    def isPlayer(s, value):
+        if value == WEST or value == EAST:
+            return True
+        return False
+    
+    def getXY(s, index, width):
+        return index % width, (index - (index % width)) / width
 
     # Locates the player and the door in the level
     # Sets the x,y coords of the player and the goal
     def locateStartAndGoalState(s):
-        s.goalPos = data.Coordinate(-1,-1)
-        s.root.player.setPos(-1,-1)
-        for i in range(0,s.length):
-            if s.level.layout[i] == DOOR:
-                x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
-                s.goalPos = data.Coordinate(x,y)
-            elif s.level.layout[i] == WEST or s.level.layout[i] == EAST:
-                x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
-                s.root.player.setPos(x,y)
-                s.root.player.setIndex(i)
-                s.root.player.setDirection(s.level.layout[i])
+        width = s.level.width
+
+        i = s.level.layout.index(DOOR)
+        x,y = s.getXY(i, width)
+        s.goalPos = data.Coordinate(x,y)
+            
+        try:
+            i = s.level.layout.index(WEST)
+        except:
+            i = s.level.layout.index(EAST)
+
+        x,y = s.getXY(i, width)
+        s.root.player.setPos(x,y)
+        s.root.player.setIndex(i)
+        s.root.player.setDirection(s.level.layout[i])
 
     # Computes the taxi cab distance between the player and the door
     # Sets s.modifier to -1 if the value is negative and 1 otherwise
@@ -65,7 +75,6 @@ class Solver:
     # to both the east and the west of the obstacle
     def findBlockGoals(s):
         s.blockGoals = []
-        numOfObs = len(s.obstacles)
         nonEmpty = [BRCK, BLCK]
         for index,height in s.obstacles.iteritems():
             reset = 0
@@ -103,9 +112,8 @@ class Solver:
         cur = s.dt[index]
         s.obstacles = {}
         s.obstacleFlag = False
-        mod = 1
-        s.checkObstaclesHelper(0,0,0, cur.player.index + mod, cur.level, mod)
-        s.checkObstaclesHelper(0,0,0, cur.player.index - mod, cur.level, -mod)
+        s.checkObstaclesHelper(0,0,0, cur.player.index + 1, cur.level, 1)
+        s.checkObstaclesHelper(0,0,0, cur.player.index - 1, cur.level, -1)
 
     # Recursive helper function for finding obstacles.  It will scan along the ground and descend into pits
     # until an obstacle is found.  When an obstacle is found it will check its height, if its height is more that
@@ -170,7 +178,7 @@ class Solver:
 
     # analyze the move quadrants generated, and check them for legal moves.
     # Add legal moves into list
-    def analyzeMoveQuads(s, move, index):
+    def analyzeMove(s, move, index):
         cur = s.dt[index]
         for k,v in s.validMoves.iteritems():
             if move in v:
@@ -183,8 +191,8 @@ class Solver:
 
     # Add a move to the currently available moves list
     def addMove(s, move):
-        if move not in s.quadMoves:
-            s.quadMoves.append(move)
+        if move not in s.availableMoves:
+            s.availableMoves.append(move)
 
     # Recusively scans down until a non empty space is found
     def checkDown(s,index, level):
@@ -196,17 +204,17 @@ class Solver:
     # Have the player perform the move, and update the level
     def performMove(s,level,data, player, move):
         oldIndex = player.index
-
+        width = s.level.width
         if move == "fa":
-            player.fall(s.level.width)
+            player.fall(width)
         elif move == "w":
             player.moveWest()
         elif move == "e":
             player.moveEast()
         elif move == "nw":
-            player.moveNWest(s.level.width)
+            player.moveNWest(width)
         elif move == "ne":
-            player.moveNEast(s.level.width)
+            player.moveNEast(width)
         elif move == "fw":
             player.setDirection(WEST)
         elif move == "fe":
@@ -222,22 +230,6 @@ class Solver:
         level.layout[oldIndex] = 0
         level.layout[player.index] = player.dir
 
-    # Get the parent index of the current working index.
-    # Uses the same indexing scheme as n-ary array representation of trees
-    def getParentIndex(s):
-        s.par =  int ( math.floor( (s.i - 1) / 3 ) )
-        if s.par < 0:
-            s.par = 0
-
-    # Takes an index and uses it to generate the index of the nth child
-    # Uses the same indexing scheme as n-ary array representation of trees
-    def getNthChild(s,index, nth):
-        return 3 * index + 1 + nth
-
-    # Returns a list of the children indices of index
-    def getChildren(s,index):
-        return [ s.getNthChild(index,0), s.getNthChild(index, 1), s.getNthChild(index, 2)]
-
     # Pops a child index of the parents list of children
     # Creates a new node and deep copies the parents data
     # Generates the list of children for the new node
@@ -245,15 +237,9 @@ class Solver:
     # nodes move list, then performs using the new nodes player and level
     # adds the node to the tree
     def addToTree(s, tree, parent, move):
-        s.i = s.dt[s.par].children.pop(0)
-        newChild = data.Node()
-        newChild.move = move
-        newChild.moveList = list(parent.moveList)
-        newChild.moveList.append(move)
-        newChild.player.copy(parent.player)
-        newChild.level.copy(parent.level)
-        newChild.children = s.getChildren(s.i)
-        newChild.blockGoals = list(s.blockGoals)
+        p = parent
+        s.i = s.dt[s.par].popChild()
+        newChild = data.Node(s.i, move, p.moveList, p.player, p.level, s.blockGoals )
         s.performMove(newChild.level, newChild, newChild.player, move)
         tree[s.i] = newChild
 
@@ -295,14 +281,14 @@ class Solver:
     # and then loops through the list of available moves and 
     def pickMoves(s):
         cur = s.dt[s.par]
-        if "fa" in s.quadMoves:  # If fall is a choice, it is the only choice.
+        if "fa" in s.availableMoves:  # If fall is a choice, it is the only choice.
             s.addToTree(s.dt, s.dt[s.par], "fa")
             s.counter += 1
             return
 
         if s.obstacleFlag: # If check to see if obstacles have been cleared
             s.checkObstacles(s.par)
-        for move in s.quadMoves:
+        for move in s.availableMoves:
             s.checkCycles(move, s.dt[s.par].moveList)
             if not s.obstacleFlag:  # If there are no obstacles, run for the goal
                 if s.modifier < 0:
@@ -320,12 +306,13 @@ class Solver:
         s.counter += 1
 
     def solve(s):
-        s.locateStartAndGoalState()
         s.i = 1
+        s.locateStartAndGoalState()
         s.checkObstaclesFindBlocks(0)
         
         bottom, s.counter = 0, 0
         startTime = time.clock()
+
         while not s.victory:
             lenDt = len(s.dt)
             if bottom == lenDt:
@@ -337,17 +324,14 @@ class Solver:
                 s.generateMoveQuads(cur.player.index, cur.level.layout, s.root.level.width, cur.level, cur.moveList)
                 for move in s.moveQuadrants:
                     s.checkVictory(move, cur.moveList)
-                    if s.victory:
-                        break
-                    s.analyzeMoveQuads(move,s.par)
+                    s.analyzeMove(move,s.par)
                 s.pickMoves()
-                s.quadMoves = []
+                s.availableMoves = []
                 bottom = s.counter
         
-        print "\nTime taken(secs): ", time.clock() - startTime
-        moveListWorstCase = (3**len(s.moveList))
-        treeReduction = (moveListWorstCase - len(s.dt))
-        print "Solved!!! Uses", len(s.moveList), "moves and a tree with", len(s.dt), "nodes, a reduction of %.5g nodes" %treeReduction
+        endTime = time.clock() - startTime
+        numMoves = len(s.moveList)
+        print "\nTime taken(secs): {} \nSolved using {} moves!".format(endTime, numMoves)
 
     def stepThroughSolution(s):
         currentMove = s.moveList.pop(0)
