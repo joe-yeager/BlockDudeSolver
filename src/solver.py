@@ -1,4 +1,5 @@
 import sys
+from src import data
 from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
 import csv
@@ -16,7 +17,7 @@ class Solver:
         
         # Set up the search tree root node
         s.dt = OrderedDict()
-        s.dt[0] = Node()
+        s.dt[0] = data.Node()
         s.root = s.dt[0]
         s.root.moveList = []
         s.root.children = s.getChildren(0)
@@ -69,21 +70,21 @@ class Solver:
 
     # Takes a level as an argument and sets it as the current working level in the solver
     def setLevel(s,level):
-        s.root.level = Level(level.width,level.height,list(level.layout) )
-        s.level = Level(level.width,level.height,list(level.layout) )
+        s.root.level = data.Level(level.width,level.height,list(level.layout) )
+        s.level = data.Level(level.width,level.height,list(level.layout) )
         s.currentLevel = s.root.level
         s.length = len(s.level.layout)
-        s.root.player = Player()
+        s.root.player = data.Player()
 
     # Locates the player and the door in the level
     # Sets the x,y coords of the player and the goal
     def locateStartAndGoalState(s):
-        s.goalPos = Coordinate(-1,-1)
+        s.goalPos = data.Coordinate(-1,-1)
         s.root.player.setPos(-1,-1)
         for i in range(0,s.length):
             if s.level.layout[i] == DOOR:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
-                s.goalPos = Coordinate(x,y)
+                s.goalPos = data.Coordinate(x,y)
             elif s.level.layout[i] == WEST or s.level.layout[i] == EAST:
                 x, y = i % s.level.width, (i - (i%s.level.width))/s.level.width
                 s.root.player.setPos(x,y)
@@ -94,7 +95,7 @@ class Solver:
     # Sets s.modifier to -1 if the value is negative and 1 otherwise
     # The modifer is used quite often in other computations
     def taxiCabDistance(s, player):
-        s.taxiCab = Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
+        s.taxiCab = data.Coordinate(s.goalPos.x - player.pos.x, s.goalPos.y - player.pos.y)
         s.modifier = s.taxiCab.x / abs(s.taxiCab.x)
 
     # Uses the list of obstacles computed by checkObstacles to determine
@@ -283,7 +284,7 @@ class Solver:
     # adds the node to the tree
     def addToTree(s, tree, parent, move):
         s.i = s.dt[s.par].children.pop(0)
-        newChild = Node()
+        newChild = data.Node()
         newChild.move = move
         newChild.moveList = list(parent.moveList)
         newChild.moveList.append(move)

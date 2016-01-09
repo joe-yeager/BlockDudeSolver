@@ -1,4 +1,4 @@
-import src import solver, player, app, data
+from src import solver, app, data
 import sys
 from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
@@ -11,7 +11,7 @@ width, height = 0,0
 
 if __name__=='__main__':
     root = Tk()
-    app = App(root)
+    _app = app.App(root)
     setPause = False
     testFiles = ["level1.csv", "level2.csv","level3.csv","level4.csv","level5.csv","level6.csv","level7.csv"]
     gameFiles = ["level1.csv","level2.csv"]
@@ -19,10 +19,10 @@ if __name__=='__main__':
     if len(sys.argv) >= 2:
         if "test" in sys.argv:
             print "Loading test sets..."
-            app.loadLevels("./testLevels/", testFiles)
+            _app.loadLevels("./testLevels/", testFiles)
         if "game" in sys.argv:
             print "Loading game levels..."
-            app.loadLevels("./gameLevels/", gameFiles)
+            _app.loadLevels("./gameLevels/", gameFiles)
         if "pause" in sys.argv:
             setPause = True
     else:
@@ -30,22 +30,22 @@ if __name__=='__main__':
         sys.exit(0)
 
     def startFunction():
-        for i in range(0, len(app.levels)):
-            solver = Solver()
-            solver.setLevel(app.levels[i])
-            app.displayLevel(app.levels[i])
+        for i in range(0, len(_app.levels)):
+            _solver = solver.Solver()
+            _solver.setLevel(_app.levels[i])
+            _app.displayLevel(_app.levels[i])
             root.update()
-            solver.solve()
+            _solver.solve()
             
             if setPause:
                 raw_input("Press Enter to view solution...")
-            while(len(solver.moveList) > 0):
+            while(len(_solver.moveList) > 0):
                 root.update()
-                solver.stepThroughSolution()
-                app.displayLevel(solver.currentLevel)
+                _solver.stepThroughSolution()
+                _app.displayLevel(_solver.currentLevel)
                 time.sleep(0.13)
             if setPause:
-                if i != len(app.levels) -1:
+                if i != len(_app.levels) -1:
                     raw_input("Press Enter to begin solving next level")
                 else:
                     raw_input("Done!  Press enter to exit.")
@@ -53,4 +53,4 @@ if __name__=='__main__':
         sys.exit(0)
 
     root.after(500, startFunction)
-    app.run()
+    _app.run()

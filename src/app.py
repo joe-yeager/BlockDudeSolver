@@ -1,4 +1,5 @@
 import sys
+from src import data
 from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
 import csv
@@ -48,7 +49,7 @@ class App:
                 level = map(int,reader)
                 width = level.pop(0)
                 height = level.pop(0)
-                newLevel = Level(width,height,level)
+                newLevel = data.Level(width,height,level)
                 s.levels.append(newLevel)
 
     def updateCanvasDems(s,width, height):
