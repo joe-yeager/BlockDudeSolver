@@ -1,19 +1,15 @@
-import sys
 from src import data
-from Tkinter import Tk, Frame, Canvas
-from PIL import ImageTk
-import csv
 import time
 import math
 from collections import OrderedDict
+import json
 EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
-
 
 # The solver class contains all of the logic that is needed to solve
 # the first two levels of Block Dude as well as all the test sets.
 class Solver:
-    def __init__(s):
+    def __init__(s, data_file):
         
         # Set up the search tree root node
         s.dt = OrderedDict()
@@ -28,45 +24,11 @@ class Solver:
 
         # validMoves contains all of the legal moves that can be made
         # Thhe moves are expressed as 2x2 matrices that have been linearized
-        s.validMoves = {
-            "e":  [[0,0,4,0]],
-            "w":  [[0,0,0,3]],
-            "fe": [[0,0,3,0],[0,0,3,1],[0,0,3,2],[0,1,3,1],[0,2,3,2],[0,2,3,1],[0,1,3,2]],
-            "fw": [[0,0,0,4],[0,0,1,4],[0,0,2,4],[1,0,1,4],[2,0,2,4],[2,0,1,4],[2,0,1,4]],
-            "nw": [[0,0,1,3],[0,0,2,3]],
-            "ne": [[0,0,4,1],[0,0,4,2]],
-            "pu": [[0,0,4,2],[0,0,2,3]],
-            "dr": [[0,0,4,0], [0,0,0,3],[0,0,4,1]],
-            "fa": [[3,1,0,1],[3,1,0,0],[3,0,0,0],[3,2,0,1],[3,2,0,0],[3,1,0,2],[3,2,0,2],[3,0,0,1],[3,0,0,2],
-                            [1,4,1,0],[1,4,0,0],[0,4,0,0],[2,4,1,0],[2,4,0,0],[1,4,2,0],[2,4,2,0],[0,4,1,0],[0,4,2,0]]
-        }
-
-        # Victory moves contains all of the legal moves that result in victory.
-        s.victoryMoves = {
-            "e":    [[0,0,4,5]],
-            "w":    [[0,0,5,3]],
-            "nw":   [[5,0,1,3],[5,0,2,3]],
-            "ne":   [[0,5,4,1],[0,5,4,2]],
-            "fa": [[3,1,5,1],[3,1,5,0],[3,0,5,0],[3,2,5,1],[3,2,5,0],[3,1,5,2],[3,2,5,2],[3,0,5,1],[3,0,5,2],
-                        [1,4,1,5],[1,4,0,5],[0,4,0,5],[2,4,1,5],[2,4,0,5],[1,4,2,5],[2,4,2,5],[0,4,1,5],[0,4,2,5]]
-        }
-
-        # List of moves that result in cycles or backwards progress
-        s.cyclicalMoves = [
-            ["w", "fa", "fe", "ne"], ["e", "fa", "fw", "nw"],
-            ["fw", "w", "fe", "e"],  ["fe", "e", "fw", "w"],
-            ["w", "w", "w", "fe"],   ["e", "e", "e", "fw"],
-            ['pu', 'e', 'fw', 'dr'], ['pu', 'w', 'fe', 'dr'],
-            
-            ["w", "w", "fe"],  ["e", "e", "fw"],            
-            ["w", "fe", "e"],  ["e", "fw", "w"],
-            ["ne", "fw", "w"], ["nw", "fe", "e"],
-            ["w", "w", "fe"],  ["e", "e", "fw"],
-            
-            ["fw", "fe"], ["fe", "fw"],
-            ["dr", "pu"], ["pu", "dr"],
-            ["w", "fe"],  ["e", "fw"]
-        ]
+        with open(data_file) as data_json:
+            moves = json.load(data_json)
+        s.validMoves = moves.get("valid_moves", None)
+        s.victoryMoves = moves.get("victory_moves", None)
+        s.cyclicalMoves = moves.get("cyclical_moves", None)
 
     # Takes a level as an argument and sets it as the current working level in the solver
     def setLevel(s,level):

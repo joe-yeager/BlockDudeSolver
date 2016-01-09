@@ -1,11 +1,7 @@
-import sys
 from src import data
 from Tkinter import Tk, Frame, Canvas
 from PIL import ImageTk
 import csv
-import time
-import math
-from collections import OrderedDict
 EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 width, height = 0,0
 
