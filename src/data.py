@@ -1,125 +1,126 @@
 from src import constants as c
-from collections import OrderedDict
 
-# EMPY, BRCK, BLCK, WEST, EAST, DOOR = 0,1,2,3,4,5
 
 #####################################################################
 ######################        Data Types        #####################
 #####################################################################
 class Coordinate:
-    def __init__(s, x, y):
-        s.x, s.y = x, y
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
 
 class Level:
-    def __init__(s, width,height,layout):
-        s.width, s.height, s.layout = width, height, list(layout)
+    def __init__(self, width, height, layout):
+        self.width, self.height, self.layout = width, height, list(layout)
 
-    def copy(s, level):
-        s.width = level.width
-        s.height = level.height
-        s.layout = list(level.layout)
+    def copy(self, level):
+        self.width = level.width
+        self.height = level.height
+        self.layout = list(level.layout)
 
-class Tree:
-    def __init__(s):
-        pass
 
 class Node:
-    def __init__(s, index, move, moveList, player, level, blockGoals):
-        s.index = index
-        
-        s.level = Level(0,0,[])
-        s.level.copy(level)
-        
-        s.player = Player()
-        s.player.copy(player)
-        
-        s.setMove(move)
-        s.setMoveList(moveList)
-        s.addToMoveList(move)
+    def __init__(self, index, move, move_list, player, level, block_goals):
+        self.index = index
 
-        s.setBlockGoals(blockGoals)
-        
-        s.children = [ s.getNthChild(0), s.getNthChild(1), s.getNthChild(2)]
+        self.move = None
+        self.moveList = None
+        self.blockGoals = None
 
-    def getNthChild(s,nth):
-        return 3 * s.index + 1 + nth
+        self.level = Level(0, 0, [])
+        self.level.copy(level)
 
-    def popChild(s):
-        return s.children.pop(0)
+        self.player = Player()
+        self.player.copy(player)
 
-    def setMove(s, move):
-        s.move = move
+        self.set_move(move)
+        self.set_move_list(move_list)
+        self.add_to_move_list(move)
 
-    def getMove(s):
-        return s.move
+        self.set_block_goals(block_goals)
 
-    def setMoveList(s, moveList):
-        s.moveList = list(moveList)
+        self.children = [self.get_nth_child(0), self.get_nth_child(1), self.get_nth_child(2)]
 
-    def getMoveList(s):
-        return list(s.moveList)
+    def get_nth_child(self, nth):
+        return 3 * self.index + 1 + nth
 
-    def addToMoveList(s, move):
-        s.moveList.append(move)
+    def pop_child(self):
+        return self.children.pop(0)
 
-    def setBlockGoals(s, blockGoals):
-        s.blockGoals = list(blockGoals)
+    def set_move(self, move):
+        self.move = move
 
-    def getBlockGoals(s, blockGoals):
-        return s.blockGoals
+    def get_move(self):
+        return self.move
 
-    def setLevel(s, level):
-        s.level.copy(level)
+    def set_move_list(self, move_list):
+        self.moveList = list(move_list)
+
+    def get_move_list(self):
+        return list(self.moveList)
+
+    def add_to_move_list(self, move):
+        self.moveList.append(move)
+
+    def set_block_goals(self, block_goals):
+        self.blockGoals = list(block_goals)
+
+    def get_block_goals(self):
+        return self.blockGoals
+
+    def set_level(self, level):
+        self.level.copy(level)
+
 
 class Player:
-    def __init__(s):
-        s.pos = Coordinate(0,0)
-        s.dir, s.index,s.index2 = 0, 0, 0
-        s.isHoldingBlock, s.falling = False, False
+    def __init__(self):
+        self.pos = Coordinate(0, 0)
+        self.dir, self.index, self.index2 = 0, 0, 0
+        self.isHoldingBlock, self.falling = False, False
 
-    def copy(s, player):
-        s.setPos(player.pos.x, player.pos.y)
-        s.dir = player.dir
-        s.index = player.index
-        s.isHoldingBlock = player.isHoldingBlock
-        s.falling = player.falling
+    def copy(self, player):
+        self.set_pos(player.pos.x, player.pos.y)
+        self.dir = player.dir
+        self.index = player.index
+        self.isHoldingBlock = player.isHoldingBlock
+        self.falling = player.falling
 
-    def setPos(s,x,y):
-        s.pos.x, s.pos.y = x, y
+    def set_pos(self, x, y):
+        self.pos.x, self.pos.y = x, y
 
-    def setDirection(s, playerValue):
-        s.dir = playerValue
+    def set_direction(self, player_value):
+        self.dir = player_value
 
-    def moveEast(s):
-        s.index += 1
+    def move_east(self):
+        self.index += 1
 
-    def moveWest(s):
-        s.index -= 1
+    def move_west(self):
+        self.index -= 1
 
-    def moveNEast(s, width):
-        s.moveEast()
-        s.index -= (width)
+    def move_north_east(self, width):
+        self.move_east()
+        self.index -= width
 
-    def moveNWest(s,width):
-        s.moveWest()
-        s.index -= (width)
+    def move_north_west(self, width):
+        self.move_west()
+        self.index -= width
 
-    def fall(s, width):
-        s.index += (width)
+    def fall(self, width):
+        self.index += width
 
-    def pickupBlock(s):
-        s.isHoldingBlock = True
-        return s.getAdj()
+    def pickup_block(self):
+        self.isHoldingBlock = True
+        return self.get_adjacent()
 
-    def dropBlock(s):
-        s.isHoldingBlock = False
-        return s.getAdj()
+    def drop_block(self):
+        self.isHoldingBlock = False
+        return self.get_adjacent()
 
-    def setIndex(s, index):
-        s.index = index
+    def set_index(self, index):
+        self.index = index
 
-    def getAdj(s):
-        if s.dir == c.WEST:
-            return s.index - 1
+    def get_adjacent(self):
+        if self.dir == c.WEST:
+            return self.index - 1
         else:
-            return s.index + 1
+            return self.index + 1
